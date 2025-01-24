@@ -190,6 +190,7 @@ L.Control.Menubar = L.Control.extend({
 				{type: 'separator'},
 				{name: _UNO('.uno:HyperlinkDialog'), id: 'inserthyperlink', type: 'action'},
 				{name: _('Smart Picker'), id: 'remotelink', type: 'action'},
+				{name: _('AI Assistant'), id: 'remoteaicontent', type: 'action'},
 				{type: 'separator'},
 				{uno: '.uno:InsertQrCode'},
 				{uno: '.uno:InsertSymbol'},
@@ -484,6 +485,7 @@ L.Control.Menubar = L.Control.extend({
 				{type: 'separator'},
 				{name: _UNO('.uno:HyperlinkDialog'), id: 'inserthyperlink', type: 'action'},
 				{name: _('Smart Picker'), id: 'remotelink', type: 'action'},
+				{name: _('AI Assistant'), id: 'remoteaicontent', type: 'action'},
 				{type: 'separator'},
 				{uno: '.uno:InsertSymbol'},
 				{type: 'separator'},
@@ -631,6 +633,7 @@ L.Control.Menubar = L.Control.extend({
 				{type: 'separator'},
 				{name: _UNO('.uno:HyperlinkDialog'), id: 'inserthyperlink', type: 'action'},
 				{name: _('Smart Picker'), id: 'remotelink', type: 'action'},
+				{name: _('AI Assistant'), id: 'remoteaicontent', type: 'action'},
 				{type: 'separator'},
 				{uno: '.uno:InsertSymbol'},
 				{type: 'separator'},
@@ -645,7 +648,6 @@ L.Control.Menubar = L.Control.extend({
 					{name: _UNO('.uno:InsertPagesField', 'presentation'), uno: '.uno:InsertPagesField'},
 				]},
 				{name: _UNO('.uno:InsertSignatureLine'), id: 'insert-signatureline', type: 'action'},
-				{name: _('Electronic signature...'), id: 'insert-esignature', type: 'action'},
 			]},
 			{name: _UNO('.uno:FormatMenu', 'presentation'), id: 'format', type: 'menu', menu: [
 				{uno: '.uno:FontDialog'},
@@ -786,6 +788,7 @@ L.Control.Menubar = L.Control.extend({
 				{type: 'separator'},
 				{name: _UNO('.uno:HyperlinkDialog'), uno: '.uno:HyperlinkDialog'},
 				{name: _('Smart Picker'), id: 'remotelink', type: 'action'},
+				{name: _('AI Assistant'), id: 'remoteaicontent', type: 'action'},
 				{uno: '.uno:InsertSymbol'},
 				{type: 'separator'},
 				{name: _UNO('.uno:InsertField', 'text'), type: 'menu', menu: [
@@ -1366,7 +1369,7 @@ L.Control.Menubar = L.Control.extend({
 		commandStates: {},
 
 		// Only these menu options will be visible in readonly mode
-		allowedReadonlyMenus: ['file', 'downloadas', 'view', 'insert', 'slide', 'help'],
+		allowedReadonlyMenus: ['file', 'downloadas', 'view', 'insert', 'slide', 'help', 'print'],
 
 		// Only these UNO commands will be enabled in readonly mode
 		allowedViewModeCommands: [
@@ -1375,14 +1378,14 @@ L.Control.Menubar = L.Control.extend({
 
 		allowedViewModeActions: [
 			() => app.sectionContainer.getSectionWithName(L.CSections.CommentList.name).hasAnyComments() ? 'savecomments' : undefined,
-			'shareas', 'print', // file menu
+			'shareas', //file menu
+			'print','print-active-sheet', 'print-all-sheets', 'print-notespages', // file menu
 			'downloadas-odt', 'downloadas-doc', 'downloadas-docx', 'downloadas-rtf', // file menu
 			'downloadas-odp', 'downloadas-ppt', 'downloadas-pptx', 'downloadas-odg', 'exportpdf' , // file menu
 			!window.ThisIsAMobileApp ? 'exportdirectpdf' : 'downloadas-pdf', !window.ThisIsAMobileApp ? 'exportepub' : 'downloadas-epub', // file menu
 			'downloadas-ods', 'downloadas-xls', 'downloadas-xlsx', 'downloadas-csv', 'closedocument', // file menu
 			!(L.Browser.ie || L.Browser.edge) ? 'fullscreen' : undefined, 'zoomin', 'zoomout', 'zoomreset', 'showstatusbar', 'showresolved', 'showannotations', 'toggledarktheme', // view menu
 			'insert-signatureline', // insert menu
-			() => app.map.eSignature ? 'insert-esignature' : undefined, // insert menu
 			'about', 'keyboard-shortcuts', 'latestupdates', 'feedback', 'serveraudit', 'online-help', 'report-an-issue', // help menu
 			'insertcomment'
 		]
@@ -1931,6 +1934,13 @@ L.Control.Menubar = L.Control.extend({
 				else
 					$(aItem).hide();
 			}
+
+			if (id === 'remoteaicontent') {
+				if (self._map['wopi'].EnableRemoteAIContent)
+					$(aItem).show();
+				else
+					$(aItem).hide();
+			}
 		});
 	},
 
@@ -1993,6 +2003,7 @@ L.Control.Menubar = L.Control.extend({
 			|| id.startsWith('zotero')
 			|| id === 'deletepage'
 			|| id === 'remotelink'
+			|| id === 'remoteaicontent'
 			|| id === 'toggledarktheme'
 			|| id === 'invertbackground'
 			|| id === 'home-search'
@@ -2011,12 +2022,11 @@ L.Control.Menubar = L.Control.extend({
 					},
 				};
 				app.map.sendUnoCommand('.uno:InsertSignatureLine', args);
+				let finishMessage = _('The signature line can now be moved or resized as needed.');
+				let finishFunc = () => app.map.eSignature.insert();
+				app.map.uiManager.showSnackbar(finishMessage, _('Finish electronic signing'), finishFunc, -1);
 			} else {
 				app.map.sendUnoCommand('.uno:InsertSignatureLine');
-			}
-		} else if (id === 'insert-esignature') {
-			if (this._map.eSignature) {
-				this._map.eSignature.insert();
 			}
 		} else if (id === 'insertgraphic') {
 			L.DomUtil.get('insertgraphic').click();

@@ -1058,6 +1058,15 @@ L.Map = L.Evented.extend({
 		return this.options.crs.pointToLatLng(L.point(point), zoom);
 	},
 
+	// rescaling
+
+	rescale: function(point, oldZoom, newZoom) {
+		oldZoom = oldZoom === undefined ? this.getZoom() : oldZoom;
+		newZoom = newZoom === undefined ? this.getZoom() : newZoom;
+
+		return this.options.crs.rescale(point, oldZoom, newZoom);
+	},
+
 	/**
 	 * Get LatLng coordinates after negating the X cartesian-coordinate.
 	 * This is useful in Calc RTL mode as mouse events have regular document
@@ -1433,6 +1442,13 @@ L.Map = L.Evented.extend({
 		}
 
 		app.idleHandler._activate();
+
+		if (app.definitions.CommentSection.needFocus)
+		{
+			app.definitions.CommentSection.needFocus.focus();
+			app.sectionContainer.getSectionWithName(L.CSections.CommentList.name).select(app.needFocus)
+			app.definitions.CommentSection.needFocus = null;
+		}
 	},
 
 	// Event to change the focus to dialog or editor.
