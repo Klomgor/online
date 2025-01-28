@@ -3,7 +3,7 @@
 
 AC_PREREQ([2.63])
 
-AC_INIT([coolwsd], [24.04.12.0], [https://github.com/CollaboraOnline/online/issues], [coolwsd], [https://collaboraonline.github.io/])
+AC_INIT([coolwsd], [24.04.12.1], [https://github.com/CollaboraOnline/online/issues], [coolwsd], [https://collaboraonline.github.io/])
 LT_INIT([shared, disable-static, dlopen])
 
 AM_INIT_AUTOMAKE([1.10 foreign subdir-objects tar-pax -Wno-portability])
@@ -108,8 +108,8 @@ AC_LINK_IFELSE([AC_LANG_SOURCE([
       return v;
     }
     ])],
-               [AC_MSG_RESULT([No])],
-               [AC_MSG_RESULT([Yes])
+               [AC_MSG_RESULT([no])],
+               [AC_MSG_RESULT([yes])
                 LIBS="$LIBS -latomic"])
 
 # Declare options
@@ -364,6 +364,11 @@ AC_ARG_WITH([compiler-plugins],
                 [Experimental! Unlikely to work for anyone except Noel! Enable compiler plugins that will perform additional checks during
                  building.]))
 
+AC_ARG_ENABLE(coplugin,
+    AS_HELP_STRING([--enable-coplugin],
+        [Enables building of a clang plugin that performs COOL-specific checks.])
+)
+
 AC_ARG_ENABLE([werror],
             AS_HELP_STRING([--disable-werror],
                           [Do not turn warnings into errors.]))
@@ -497,7 +502,9 @@ if test -n "$with_logfile" ; then
    COOLWSD_LOGFILE="$with_logfile"
 fi
 AC_SUBST(COOLWSD_LOGFILE)
+AC_DEFINE_UNQUOTED([COOLWSD_LOGFILE],["$COOLWSD_LOGFILE"],[Default location of coolwsd log file])
 AC_SUBST(COOLWSD_LOGFILE_UICMD)
+AC_DEFINE_UNQUOTED([COOLWSD_LOGFILE_UICMD],["$COOLWSD_LOGFILE_UICMD"],[Default location of coolwsd UI command log file])
 
 if test -n "$with_trace_event_file" ; then
    COOLWSD_TRACEEVENTFILE="$with_trace_event_file"
@@ -1232,6 +1239,7 @@ AC_MSG_CHECKING([whether to run tests against a LibreOffice])
 version_file="$with_lo_path/program/versionrc"
 if test -f $version_file; then
     JAILS_PATH="\${abs_top_builddir}/jails"
+    CACHE_PATH="\${abs_top_builddir}/cache"
     SYSTEMPLATE_PATH="\${abs_top_builddir}/systemplate"
     have_lo_path=true
     lo_msg="test against $LO_PATH"
@@ -1244,6 +1252,7 @@ fi
 AC_SUBST(LO_PATH)
 AC_DEFINE_UNQUOTED([LO_PATH],["$LO_PATH"],[Path to LibreOffice installation])
 AC_SUBST(JAILS_PATH)
+AC_SUBST(CACHE_PATH)
 AC_SUBST(SYSTEMPLATE_PATH)
 AM_CONDITIONAL(HAVE_LO_PATH,[test "$have_lo_path" = "true"])
 
@@ -1313,14 +1322,14 @@ AM_CONDITIONAL([ENABLE_DEBUG], [test "$ENABLE_DEBUG" = "true"])
 mobile_app=
 ENABLE_MOBILEAPP=
 MOBILEAPP=0
-AC_MSG_CHECKING([Is this a mobile app])
+AC_MSG_CHECKING([if this is a mobile app])
 if test "$enable_gtkapp" = "yes" -o "$enable_iosapp" = "yes" -o "$enable_androidapp" = "yes" -o "$host_os" = "emscripten" ; then
-     AC_MSG_RESULT([Yes])
+     AC_MSG_RESULT([yes])
      mobile_app=true;
      MOBILEAPP=1
      ENABLE_MOBILEAPP=true
 else
-     AC_MSG_RESULT([No])
+     AC_MSG_RESULT([no])
 fi
 AC_DEFINE_UNQUOTED([MOBILEAPP],[$MOBILEAPP],[Define to 1 if this is a mobileapp (eg. Android) build.])
 AC_SUBST(ENABLE_MOBILEAPP)
@@ -1447,7 +1456,7 @@ AS_IF([test "$ENABLE_IOSAPP" != "true" -a "$ENABLE_ANDROIDAPP" != "true" -a "$ho
        fi
 
        PKG_CHECK_MODULES([OPENSSL], [openssl])
-       AC_MSG_CHECKING([Whether OpenSSL is recent enough])
+       AC_MSG_CHECKING([whether OpenSSL is recent enough])
        AC_COMPILE_IFELSE([AC_LANG_SOURCE([
        #include <openssl/opensslv.h>
 
@@ -1470,7 +1479,7 @@ AS_IF([test "$ENABLE_IOSAPP" != "true" -a "$ENABLE_ANDROIDAPP" != "true" -a "$ho
                          [AC_MSG_ERROR([The POCO version is too old])])
 
        # If poco is built with --unbundled, it uses the system pcre library
-       AC_MSG_CHECKING([If we need to link with -lpcre])
+       AC_MSG_CHECKING([if we need to link with -lpcre])
        AC_LINK_IFELSE([AC_LANG_SOURCE([
        #include <Poco/RegularExpression.h>
        int main(int argc, char **argv)
@@ -1481,8 +1490,8 @@ AS_IF([test "$ENABLE_IOSAPP" != "true" -a "$ENABLE_ANDROIDAPP" != "true" -a "$ho
            return e.match(argv[[1]], m);
        }
        ])],
-                      [AC_MSG_RESULT([No])],
-                      [AC_MSG_RESULT([Yes])
+                      [AC_MSG_RESULT([no])],
+                      [AC_MSG_RESULT([yes])
                        LIBS="$LIBS -lpcre"])
 
        ])
@@ -1530,6 +1539,15 @@ AS_IF([test `uname -s` = "FreeBSD"],
 # need this after the other stuff that uses the compiler because we don't want to run configure-tests with the plugins enabled
 AS_IF([test -n "$with_compiler_plugins"],
       [CPPFLAGS="$CPPFLAGS -Xclang -load -Xclang ${with_compiler_plugins}/compilerplugins/obj/plugin.so -Xclang -add-plugin -Xclang loplugin -Xclang -plugin-arg-loplugin -Xclang --cool-base-path=\${abs_top_srcdir}"])
+
+# Clang plugin.
+AC_MSG_CHECKING([whether to build a clang plugin])
+if test "$enable_coplugin" = "yes"; then
+    AC_MSG_RESULT([yes])
+    CPPFLAGS="$CPPFLAGS -Xclang -load -Xclang \${abs_top_srcdir}/clang/plugin.so -Xclang -add-plugin -Xclang coplugin"
+else
+    AC_MSG_RESULT([no])
+fi
 
 if test "x${prefix}" = "xNONE"; then
     prefix=/usr/local
