@@ -3,7 +3,7 @@
  * L.CanvasTileLayer is a layer with canvas based rendering.
  */
 
-/* global app L JSDialog CanvasSectionContainer GraphicSelection CanvasOverlay CDarkOverlay CSplitterLine CursorHeaderSection $ _ CPointSet CPolyUtil CPolygon Cursor CCellSelection PathGroupType UNOKey UNOModifier Uint8ClampedArray Uint8Array */
+/* global app L JSDialog CanvasSectionContainer GraphicSelection CanvasOverlay CDarkOverlay CSplitterLine CursorHeaderSection $ _ CPointSet CPolyUtil CPolygon Cursor CCellSelection PathGroupType UNOKey UNOModifier Uint8ClampedArray Uint8Array cool OtherViewCellCursorSection */
 
 /*eslint no-extend-native:0*/
 if (typeof String.prototype.startsWith !== 'function') {
@@ -496,7 +496,7 @@ L.TileSectionManager = L.Class.extend({
 		return {
 			offset: this._offset,
 			topLeft: docTopLeft.add(this._offset),
-			center: this._map.project(this._map.unproject(newPaneCenter, this._map.getZoom()), this._map.getScaleZoom(scale))
+			center: this._map.rescale(newPaneCenter, this._map.getZoom(), this._map.getScaleZoom(scale)),
 		};
 	},
 
@@ -1588,7 +1588,7 @@ L.CanvasTileLayer = L.Layer.extend({
 		else if (textMsg.startsWith('contentcontrol:')) {
 			textMsg = textMsg.substring('contentcontrol:'.length + 1);
 			if (!app.sectionContainer.doesSectionExist(L.CSections.ContentControl.name)) {
-				app.sectionContainer.addSection(new app.definitions.ContentControlSection());
+				app.sectionContainer.addSection(new cool.ContentControlSection());
 			}
 			var section = app.sectionContainer.getSectionWithName(L.CSections.ContentControl.name);
 			section.drawContentControl(JSON.parse(textMsg));
@@ -2291,12 +2291,12 @@ L.CanvasTileLayer = L.Layer.extend({
 		}
 
 		if (obj.rectangle.match('EMPTY'))
-			app.definitions.otherViewCellCursorSection.removeView(viewId);
+			OtherViewCellCursorSection.removeView(viewId);
 		else {
 			let strTwips = obj.rectangle.match(/\d+/g);
 			strTwips = this._convertRawTwipsToTileTwips(strTwips);
 
-			app.definitions.otherViewCellCursorSection.addOrUpdateOtherViewCellCursor(viewId, this._map.getViewName(viewId), strTwips, parseInt(obj.part));
+			OtherViewCellCursorSection.addOrUpdateOtherViewCellCursor(viewId, this._map.getViewName(viewId), strTwips, parseInt(obj.part));
 			CursorHeaderSection.deletePopUpNow(viewId);
 		}
 
@@ -2306,8 +2306,8 @@ L.CanvasTileLayer = L.Layer.extend({
 	},
 
 	goToCellViewCursor: function(viewId) {
-		if (app.definitions.otherViewCellCursorSection.doesViewCursorExist(viewId)) {
-			const viewCursorSection = app.definitions.otherViewCellCursorSection.getViewCursorSection(viewId);
+		if (OtherViewCellCursorSection.doesViewCursorExist(viewId)) {
+			const viewCursorSection = OtherViewCellCursorSection.getViewCursorSection(viewId);
 
 			if (this._selectedPart !== viewCursorSection.sectionProperties.part)
 				this._map.setPart(viewCursorSection.sectionProperties.part);
@@ -2318,7 +2318,7 @@ L.CanvasTileLayer = L.Layer.extend({
 				this.scrollToPos(new app.definitions.simplePoint(scrollX * app.pixelsToTwips, scrollY * app.pixelsToTwips));
 			}
 
-			app.definitions.otherViewCellCursorSection.showPopUpForView(viewId);
+			OtherViewCellCursorSection.showPopUpForView(viewId);
 		}
 	},
 
@@ -2360,7 +2360,7 @@ L.CanvasTileLayer = L.Layer.extend({
 
 		app.definitions.otherViewCursorSection.removeView(viewId);
 
-		app.definitions.otherViewCellCursorSection.removeView(viewId);
+		OtherViewCellCursorSection.removeView(viewId);
 		app.definitions.otherViewGraphicSelectionSection.removeView(viewId);
 		this._map.removeView(viewId);
 	},
@@ -3076,6 +3076,11 @@ L.CanvasTileLayer = L.Layer.extend({
 
 		this._sendClientVisibleArea();
 
+		const verticalOffset = this.getFiledBasedViewVerticalOffset();
+		if (verticalOffset) {
+			y -= verticalOffset;
+		}
+
 		app.socket.sendMessage('mouse type=' + type +
 				' x=' + x + ' y=' + y + ' count=' + count +
 				' buttons=' + buttons + ' modifier=' + modifier);
@@ -3086,6 +3091,31 @@ L.CanvasTileLayer = L.Layer.extend({
 
 		if (this._map && this._map._docLayer && (type === 'buttondown' || type === 'buttonup'))
 			app.setFollowingUser(this._map._docLayer._getViewId());
+	},
+
+	// If viewing multi-page PDF files, get the twips offset of the current part. This is
+	// needed, because core has multiple draw pages in such a case, but we have just one canvas.
+	getFiledBasedViewVerticalOffset: function() {
+		if (!app.file.fileBasedView) {
+			return;
+		}
+
+		const additionPerPart = this._partHeightTwips + this._spaceBetweenParts;
+		const verticalOffset = additionPerPart * this._selectedPart;
+
+		return verticalOffset;
+	},
+
+	// If viewing multi-page PDF files, no precise tracking of invalidations is implemented yet,
+	// so this allows requesting new tiles when we know a viewed PDF changes for some special
+	// reason.
+	requestNewFiledBasedViewTiles: function() {
+		if (!app.file.fileBasedView) {
+			return;
+		}
+
+		this._requestNewTiles();
+		this.redraw();
 	},
 
 	// Given a character code and a UNO keycode, send a "key" message to coolwsd.

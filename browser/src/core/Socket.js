@@ -63,6 +63,7 @@ app.definitions.Socket = L.Class.extend({
 		} else	{
 			try {
 				this.socket = window.createWebSocket(this.getWebSocketBaseURI(map));
+				window.socket = this.socket;
 			} catch (e) {
 				this._map.fire('error', {msg: _('Oops, there is a problem connecting to {productname}: ').replace('{productname}', (typeof brandProductName !== 'undefined' ? brandProductName : 'Collabora Online Development Edition (unbranded)')) + e, cmd: 'socket', kind: 'failed', id: 3});
 				return;
@@ -1362,6 +1363,9 @@ app.definitions.Socket = L.Class.extend({
 		else if (textMsg.startsWith('hyperlinkclicked:')) {
 			this._onHyperlinkClickedMsg(textMsg);
 		}
+		else if (textMsg.startsWith('browsersetting:')) {
+			window.prefs._initializeBrowserSetting(textMsg);
+		}
 
 		if (textMsg.startsWith('downloadas:')) {
 			var postMessageObj = {
@@ -1577,8 +1581,7 @@ app.definitions.Socket = L.Class.extend({
 			this._map.setPermission(app.file.permission);
 			window.migrating = false;
 			this._map.uiManager.initializeSidebar();
-			if (typeof window.initializedUI === 'function')
-				window.initializedUI();
+			this._map.uiManager.refreshTheme();
 		}
 
 		this._map.fire('docloaded', {status: true});

@@ -13,7 +13,7 @@
  * L.Control.NotebookbarCalc - definition of notebookbar content in Calc
  */
 
-/* global _ _UNO app */
+/* global _ _UNO */
 L.Control.NotebookbarCalc = L.Control.NotebookbarWriter.extend({
 
 	getTabs: function() {
@@ -848,7 +848,7 @@ L.Control.NotebookbarCalc = L.Control.NotebookbarWriter.extend({
 								{
 									'id': 'home-search-dialog',
 									'type': 'toolitem',
-									'text': _UNO('.uno:SearchDialog'),
+									'text': _('Replace'),
 									'command': '.uno:SearchDialog',
 									'accessibility': { focusBack: false, 	combination: 'FD',	de: null }
 								}
@@ -1385,6 +1385,14 @@ L.Control.NotebookbarCalc = L.Control.NotebookbarWriter.extend({
 				'text': _('Smart Picker'),
 				'command': 'remotelink',
 				'accessibility': { focusBack: true,	combination: 'LR', de: null }
+			} : {},
+			(this._map['wopi'].EnableRemoteAIContent) ? {
+				'id': 'insert-insert-remote-ai-content',
+				'class': 'unoremoteaicontent',
+				'type': 'bigcustomtoolitem',
+				'text': _('Assistant'),
+				'command': 'remoteaicontent',
+				'accessibility': { focusBack: true, combination: 'RL', de: null }
 			} : {},
             {
                 'type': 'container',
@@ -2010,13 +2018,13 @@ L.Control.NotebookbarCalc = L.Control.NotebookbarWriter.extend({
 				'command': '.uno:ParagraphDialog',
 				'accessibility': { focusBack: true,	combination: 'PD', de: null }
 			},
-			app.isExperimentalMode() ? {
+			{
 				'id': 'format-style-dialog',
 				'type': 'bigtoolitem',
 				'text': _('Style list'),
 				'command': '.uno:SidebarDeck.StyleListDeck',
 				'accessibility': { focusBack: false, combination: 'SD', de: null }
-			} : {},
+			},
 			{
 				'id': 'format-page-format-dialog',
 				'type': 'bigtoolitem',
