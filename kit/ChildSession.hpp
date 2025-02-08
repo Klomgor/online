@@ -50,7 +50,7 @@ private:
     std::set<std::string> _cmdToLog = {
         "uno", "key", "mouse", "textinput", "removetextcontext",
         "paste", "insertfile", "dialogevent" };
-    // list the the uno commands here, that are not to log. It will serach these strings as a prefixes
+    // list the the uno commands here, that are not to log. It will search these strings as a prefixes
     std::set<std::string> _unoCmdToNotLog = {
         ".uno:SidebarShow", ".uno:ToolbarMode" };
     void logLine(LogUiCommandsLine &line, bool isUndoChange=false);
@@ -274,7 +274,7 @@ public:
             // FIXME: _pixmapCache
             << "\n\texportAsWopiUrl: " << _exportAsWopiUrl
             << "\n\tviewRenderedState: " << _viewRenderState
-            << "\n\tisDumpingTiles: " << _isDocLoaded
+            << "\n\tisDumpingTiles: " <<_isDumpingTiles
             << "\n\tclientVisibleArea: " << _clientVisibleArea.toString()
             << "\n\thasURP: " << _hasURP
             << "\n\tURPContext?: " << (_URPContext == nullptr)

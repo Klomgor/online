@@ -72,10 +72,6 @@ img.sidebar.ui-drawing-area {
 	padding: 0;
 }
 
-.ui-expander.jsdialog.sidebar .ui-expander-icon-right img {
-	filter: brightness(2);
-}
-
 .ui-expander.jsdialog.sidebar .ui-expander-icon-right:hover img {
 	filter: none;
 }
@@ -345,6 +341,7 @@ button#button2.ui-pushbutton.jsdialog.sidebar {
 #NavigatorDeck .ui-treeview-cell-text {
 	/* good to move this into css var*/
 	font-size: 14px;
+	white-space: break-spaces;
 }
 #NavigatorDeck .ui-treeview-cell {
 	/* Move this whole block away and fix in the main control */
@@ -368,6 +365,14 @@ span.jsdialog.sidebar.ui-treeview-notexpandable {
 #StyleListPanelPanelExpander [id='4'] button { background: transparent url('images/lc_pagestyle.svg') no-repeat center; }
 #StyleListPanelPanelExpander [id='5'] button { background: transparent url('images/lc_liststyle.svg') no-repeat center; }
 #StyleListPanelPanelExpander [id='6'] button { background: transparent url('images/lc_tablestyle.svg') no-repeat center; }
+
+
+[data-theme='dark'] #StyleListPanelPanelExpander [id='1'] button { background: transparent url('images/dark/lc_charstyle.svg') no-repeat center; }
+[data-theme='dark'] #StyleListPanelPanelExpander [id='5'] button { background: transparent url('images/dark/lc_liststyle.svg') no-repeat center; }
+[data-theme='dark'] #StyleListPanelPanelExpander [id='2'] button { background: transparent url('images/dark/lc_parastyle.svg') no-repeat center; }
+[data-theme='dark'] #StyleListPanelPanelExpander [id='4'] button { background: transparent url('images/dark/lc_pagestyle.svg') no-repeat center; }
+[data-theme='dark'] #StyleListPanelPanelExpander [id='3'] button { background: transparent url('images/dark/lc_framestyle.svg') no-repeat center; }
+[data-theme='dark'] #StyleListPanelPanelExpander [id='6'] button { background: transparent url('images/dark/lc_tablestyle.svg') no-repeat center; }
 
 #StyleListPanelPanelExpander #left.toolbox button {
 	background-size: cover;
@@ -401,6 +406,24 @@ span.jsdialog.sidebar.ui-treeview-notexpandable {
 	height: calc(100% - 45px);
 }
 
+#StyleListPanelPanelExpander #TemplatePanel .sidebar .unotoolbutton {
+	padding: 4px;
+	border: 0 solid transparent !important;
+	border-bottom-width: 2px !important;
+	background-color: transparent !important;
+	border-radius: 0 !important;
+}
+
+#StyleListPanelPanelExpander #TemplatePanel .sidebar .unotoolbutton:hover,
+#StyleListPanelPanelExpander #TemplatePanel .sidebar .unotoolbutton.selected {
+	border-bottom-color: rgba(var(--doc-type)) !important;
+}
+
+#StyleListPanelPanelExpander #TemplatePanel .sidebar .ui-content.unobutton {
+	width: var(--btn-size-m);
+	height: var(--btn-size-m);
+}
+
 #TemplatePanel {
 	display: flex;
 	flex-direction: column;
@@ -413,4 +436,9 @@ span.jsdialog.sidebar.ui-treeview-notexpandable {
 #TemplatePanel > div:nth-child(3),
 #TemplatePanel > div:nth-child(4) {
 	flex-grow: 1;
+}
+
+#TemplatePanel > div:nth-child(2),
+#TemplatePanel > div:nth-child(3) {
+	height: inherit;
 }

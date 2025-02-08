@@ -13,7 +13,7 @@
  * Calc tile layer is used to display a spreadsheet document
  */
 
-/* global app */
+/* global app CPolyUtil CPolygon */
 
 L.CalcTileLayer = L.CanvasTileLayer.extend({
 	options: {
@@ -1045,6 +1045,82 @@ L.CalcTileLayer = L.CanvasTileLayer.extend({
 			this._update();
 			this.enableDrawing();
 		}
+		if (this._map.uiManager.getHighlightMode()) {
+			if (!textMsg.match('EMPTY'))
+				this._highlightColAndRow(textMsg);
+		}
+		else
+			this._resetReferencesMarks();
+	},
+
+	updateHighlight: function () {
+		if ( this._map) {
+			if (this._map.uiManager.getHighlightMode()) {
+				var updateMsg = 'updateHighlight';
+				this._highlightColAndRow(updateMsg);
+			}
+			else
+				this._resetReferencesMarks();
+		}
+	},
+
+	_highlightColAndRow: function (textMsg) {
+		var strTwips = [];
+		if(textMsg.startsWith('updateHighlight')) {
+			strTwips[0] = app.calc.cellCursorTopLeftTwips.x;
+			strTwips[1] = app.calc.cellCursorTopLeftTwips.y;
+			strTwips[2] = app.calc.cellCursorOffset.x;
+			strTwips[3] = app.calc.cellCursorOffset.y;
+		}
+		else
+			strTwips = textMsg.match(/\d+/g);
+
+		this._resetReferencesMarks();
+		var references = [];
+		this._referencesAll = [];
+		var rectangles = [];
+		var strColor = getComputedStyle(document.documentElement).getPropertyValue('--column-row-highlight');
+		var maxCol = 268435455;
+		var maxRow = 20971124;
+		var part = this._selectedPart;
+		var topLeftTwips, offset, boundsTwips;
+
+		for(let i = 0; i < 2; i++) {
+			if (i == 0) {
+				// Column rectangle
+				topLeftTwips = new L.Point(parseInt(strTwips[0]), parseInt(0));
+				offset = new L.Point(parseInt(strTwips[2]), parseInt(maxCol));
+				boundsTwips = this._convertToTileTwipsSheetArea(
+					new L.Bounds(topLeftTwips, topLeftTwips.add(offset)));
+				rectangles.push([boundsTwips.getBottomLeft(), boundsTwips.getBottomRight(),
+				boundsTwips.getTopLeft(), boundsTwips.getTopRight()]);
+			} else {
+				// Row rectangle
+				topLeftTwips = new L.Point(parseInt(0), parseInt(strTwips[1]));
+				offset = new L.Point(parseInt(maxRow), parseInt(strTwips[3]));
+				boundsTwips = this._convertToTileTwipsSheetArea(
+					new L.Bounds(topLeftTwips, topLeftTwips.add(offset)));
+				rectangles.push([boundsTwips.getBottomLeft(), boundsTwips.getBottomRight(),
+					boundsTwips.getTopLeft(), boundsTwips.getTopRight()]);
+			}
+
+		    var docLayer = this;
+		    var pointSet = CPolyUtil.rectanglesToPointSet(rectangles, function (twipsPoint) {
+				var corePxPt = docLayer._twipsToCorePixels(twipsPoint);
+				corePxPt.round();
+				return corePxPt;
+			});
+			var reference = new CPolygon(pointSet, {
+				pointerEvents: 'none',
+				fillColor: strColor,
+				fillOpacity: 0.25,
+				weight: 2 * app.dpiScale,
+				opacity: 0.25});
+
+			references.push({mark: reference, part: part});
+			this._referencesAll.push(references[i]);
+		}
+		this._updateReferenceMarks();
 	},
 
 	_getEditCursorRectangle: function (msgObj) {

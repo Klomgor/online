@@ -3,7 +3,7 @@
  * L.CanvasTileLayer is a layer with canvas based rendering.
  */
 
-/* global app L JSDialog CanvasSectionContainer GraphicSelection CanvasOverlay CDarkOverlay CSplitterLine CursorHeaderSection $ _ CPointSet CPolyUtil CPolygon Cursor CCellSelection PathGroupType UNOKey UNOModifier Uint8ClampedArray Uint8Array */
+/* global app L JSDialog CanvasSectionContainer GraphicSelection CanvasOverlay CDarkOverlay CSplitterLine CursorHeaderSection $ _ CPointSet CPolyUtil CPolygon Cursor CCellSelection PathGroupType UNOKey UNOModifier Uint8ClampedArray Uint8Array cool OtherViewCellCursorSection */
 
 /*eslint no-extend-native:0*/
 if (typeof String.prototype.startsWith !== 'function') {
@@ -496,7 +496,7 @@ L.TileSectionManager = L.Class.extend({
 		return {
 			offset: this._offset,
 			topLeft: docTopLeft.add(this._offset),
-			center: this._map.project(this._map.unproject(newPaneCenter, this._map.getZoom()), this._map.getScaleZoom(scale))
+			center: this._map.rescale(newPaneCenter, this._map.getZoom(), this._map.getScaleZoom(scale)),
 		};
 	},
 
@@ -1588,7 +1588,7 @@ L.CanvasTileLayer = L.Layer.extend({
 		else if (textMsg.startsWith('contentcontrol:')) {
 			textMsg = textMsg.substring('contentcontrol:'.length + 1);
 			if (!app.sectionContainer.doesSectionExist(L.CSections.ContentControl.name)) {
-				app.sectionContainer.addSection(new app.definitions.ContentControlSection());
+				app.sectionContainer.addSection(new cool.ContentControlSection());
 			}
 			var section = app.sectionContainer.getSectionWithName(L.CSections.ContentControl.name);
 			section.drawContentControl(JSON.parse(textMsg));
@@ -1959,6 +1959,7 @@ L.CanvasTileLayer = L.Layer.extend({
 		app.file.textCursor.visible = command ? true : false;
 		this._removeSelection();
 		this._onUpdateCursor();
+		app.events.fire('TextCursorVisibility', { visible: app.file.textCursor.visible });
 	},
 
 	_setCursorVisible: function() {
@@ -2079,13 +2080,14 @@ L.CanvasTileLayer = L.Layer.extend({
 		}
 		else {
 			var strTwips = textMsg.match(/\d+/g);
-
 			var topLeftTwips = new L.Point(parseInt(strTwips[0]), parseInt(strTwips[1]));
 			var offset = new L.Point(parseInt(strTwips[2]), parseInt(strTwips[3]));
 			var bottomRightTwips = topLeftTwips.add(offset);
 			let _cellCursorTwips = this._convertToTileTwipsSheetArea(new L.Bounds(topLeftTwips, bottomRightTwips));
 
 			app.calc.cellAddress = new app.definitions.simplePoint(parseInt(strTwips[4]), parseInt(strTwips[5]));
+			app.calc.cellCursorTopLeftTwips = topLeftTwips;
+			app.calc.cellCursorOffset = offset;
 			let tempRectangle = _cellCursorTwips.toRectangle();
 			app.calc.cellCursorRectangle = new app.definitions.simpleRectangle(tempRectangle[0], tempRectangle[1], tempRectangle[2], tempRectangle[3]);
 			this._cellCursorSection.setPosition(app.calc.cellCursorRectangle.pX1, app.calc.cellCursorRectangle.pY1);
@@ -2159,7 +2161,7 @@ L.CanvasTileLayer = L.Layer.extend({
 			return;
 		}
 
-		// tells who trigerred cursor invalidation, but recCursors is stil "our"
+		// tells who trigerred cursor invalidation, but recCursors is still "ours"
 		var modifierViewId = parseInt(obj.viewId);
 		var weAreModifier = (modifierViewId === this._viewId);
 		if (weAreModifier && app.isFollowingOff())
@@ -2291,12 +2293,12 @@ L.CanvasTileLayer = L.Layer.extend({
 		}
 
 		if (obj.rectangle.match('EMPTY'))
-			app.definitions.otherViewCellCursorSection.removeView(viewId);
+			OtherViewCellCursorSection.removeView(viewId);
 		else {
 			let strTwips = obj.rectangle.match(/\d+/g);
 			strTwips = this._convertRawTwipsToTileTwips(strTwips);
 
-			app.definitions.otherViewCellCursorSection.addOrUpdateOtherViewCellCursor(viewId, this._map.getViewName(viewId), strTwips, parseInt(obj.part));
+			OtherViewCellCursorSection.addOrUpdateOtherViewCellCursor(viewId, this._map.getViewName(viewId), strTwips, parseInt(obj.part));
 			CursorHeaderSection.deletePopUpNow(viewId);
 		}
 
@@ -2306,8 +2308,8 @@ L.CanvasTileLayer = L.Layer.extend({
 	},
 
 	goToCellViewCursor: function(viewId) {
-		if (app.definitions.otherViewCellCursorSection.doesViewCursorExist(viewId)) {
-			const viewCursorSection = app.definitions.otherViewCellCursorSection.getViewCursorSection(viewId);
+		if (OtherViewCellCursorSection.doesViewCursorExist(viewId)) {
+			const viewCursorSection = OtherViewCellCursorSection.getViewCursorSection(viewId);
 
 			if (this._selectedPart !== viewCursorSection.sectionProperties.part)
 				this._map.setPart(viewCursorSection.sectionProperties.part);
@@ -2318,7 +2320,7 @@ L.CanvasTileLayer = L.Layer.extend({
 				this.scrollToPos(new app.definitions.simplePoint(scrollX * app.pixelsToTwips, scrollY * app.pixelsToTwips));
 			}
 
-			app.definitions.otherViewCellCursorSection.showPopUpForView(viewId);
+			OtherViewCellCursorSection.showPopUpForView(viewId);
 		}
 	},
 
@@ -2360,7 +2362,7 @@ L.CanvasTileLayer = L.Layer.extend({
 
 		app.definitions.otherViewCursorSection.removeView(viewId);
 
-		app.definitions.otherViewCellCursorSection.removeView(viewId);
+		OtherViewCellCursorSection.removeView(viewId);
 		app.definitions.otherViewGraphicSelectionSection.removeView(viewId);
 		this._map.removeView(viewId);
 	},
@@ -3076,6 +3078,11 @@ L.CanvasTileLayer = L.Layer.extend({
 
 		this._sendClientVisibleArea();
 
+		const verticalOffset = this.getFiledBasedViewVerticalOffset();
+		if (verticalOffset) {
+			y -= verticalOffset;
+		}
+
 		app.socket.sendMessage('mouse type=' + type +
 				' x=' + x + ' y=' + y + ' count=' + count +
 				' buttons=' + buttons + ' modifier=' + modifier);
@@ -3086,6 +3093,31 @@ L.CanvasTileLayer = L.Layer.extend({
 
 		if (this._map && this._map._docLayer && (type === 'buttondown' || type === 'buttonup'))
 			app.setFollowingUser(this._map._docLayer._getViewId());
+	},
+
+	// If viewing multi-page PDF files, get the twips offset of the current part. This is
+	// needed, because core has multiple draw pages in such a case, but we have just one canvas.
+	getFiledBasedViewVerticalOffset: function() {
+		if (!app.file.fileBasedView) {
+			return;
+		}
+
+		const additionPerPart = this._partHeightTwips + this._spaceBetweenParts;
+		const verticalOffset = additionPerPart * this._selectedPart;
+
+		return verticalOffset;
+	},
+
+	// If viewing multi-page PDF files, no precise tracking of invalidations is implemented yet,
+	// so this allows requesting new tiles when we know a viewed PDF changes for some special
+	// reason.
+	requestNewFiledBasedViewTiles: function() {
+		if (!app.file.fileBasedView) {
+			return;
+		}
+
+		this._requestNewTiles();
+		this.redraw();
 	},
 
 	// Given a character code and a UNO keycode, send a "key" message to coolwsd.
@@ -3310,8 +3342,8 @@ L.CanvasTileLayer = L.Layer.extend({
 		this._replayPrintTwipsMsg('invalidatecursor');
 	},
 
-	// enable or disable blinking cursor and  the cursor overlay depending on
-	// the state of the document (if the falgs are set)
+	// enable or disable blinking cursor and the cursor overlay depending on
+	// the state of the document (if the flags are set)
 	_updateCursorAndOverlay: function (/*update*/) {
 		if (app.file.textCursor.visible   // only when LOK has told us it is ok
 			&& this._map.editorHasFocus()   // not when document is not focused
@@ -3452,7 +3484,7 @@ L.CanvasTileLayer = L.Layer.extend({
 
 	_onValidityListButtonMsg: function(textMsg) {
 		var strXY = textMsg.match(/\d+/g);
-		var validatedCellAddress = new app.definitions.simplePoint(parseInt(strXY[0]), parseInt(strXY[1])); // Cell address of the validility list.
+		var validatedCellAddress = new app.definitions.simplePoint(parseInt(strXY[0]), parseInt(strXY[1])); // Cell address of the validity list.
 		var show = parseInt(strXY[2]) === 1;
 		if (show) {
 			if (this._validatedCellAddress && !validatedCellAddress.equals(this._validatedCellAddress.toArray())) {
@@ -3872,7 +3904,7 @@ L.CanvasTileLayer = L.Layer.extend({
 		var menuData = this._map._docLayer.getCommentWizardStructure();
 		this._map.fire('mobilewizard', {data: menuData});
 
-		// if annotation is provided we can select perticular comment
+		// if annotation is provided we can select particular comment
 		if (annotation) {
 			$('#comment' + annotation.sectionProperties.data.id).click();
 		}

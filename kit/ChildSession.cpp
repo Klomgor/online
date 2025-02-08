@@ -484,6 +484,11 @@ bool ChildSession::_handleInput(const char *buffer, int length)
 
         return success;
     }
+    else if (tokens.equals(0, "addconfig"))
+    {
+        Poco::Path presetsPath(JAILED_CONFIG_ROOT);
+        getLOKit()->setOption("addconfig", Poco::URI(presetsPath).toString().c_str());
+    }
     else if (!_isDocLoaded)
     {
         sendTextFrameAndLogError("error: cmd=" + tokens[0] + " kind=nodocloaded");
@@ -540,7 +545,8 @@ bool ChildSession::_handleInput(const char *buffer, int length)
         // All other commands are such that they always require a LibreOfficeKitDocument session,
         // i.e. need to be handled in a child process.
 
-        assert(tokens.equals(0, "clientzoom") ||
+        assert(Util::isFuzzing() ||
+               tokens.equals(0, "clientzoom") ||
                tokens.equals(0, "clientvisiblearea") ||
                tokens.equals(0, "outlinestate") ||
                tokens.equals(0, "downloadas") ||
@@ -844,7 +850,7 @@ bool ChildSession::_handleInput(const char *buffer, int length)
         }
         else
         {
-            assert(false && "Unknown command token.");
+            assert(Util::isFuzzing() && "Unknown command token.");
         }
     }
 
@@ -3915,7 +3921,7 @@ LogUiCommands::~LogUiCommands()
                 if (_tokens->equals(2, "char=0"))
                 {
                     uint32_t keyCode=0;
-                    _tokens->getUInt32(3,"key",keyCode);
+                    (void)_tokens->getUInt32(3,"key",keyCode);
                     actSubCmd = "";
                     if (keyCode & 8192)
                         actSubCmd += "ctrl-";
@@ -3946,6 +3952,10 @@ LogUiCommands::~LogUiCommands()
                     return;
                 actCmd = (*_tokens)[0];
                 actSubCmd = (*_tokens)[1];
+                std::size_t pos = actSubCmd.find_first_of ('?');
+                if (pos != std::string::npos) {
+                    actSubCmd = actSubCmd.substr (0,pos);
+                }
             }
             else if (_tokens->equals(0, "mouse"))
             {
@@ -4045,8 +4055,8 @@ LogUiCommands::~LogUiCommands()
             }
             // Store new command
             LogUiCommandsLine& lineAct = _session->_lastUiCmdLinesLogged[lineCount];
-            lineAct._cmd = actCmd;
-            lineAct._subCmd = actSubCmd;
+            lineAct._cmd = std::move(actCmd);
+            lineAct._subCmd = std::move(actSubCmd);
             lineAct._repeat = 1;
             lineAct._undoChange = undoChg;
             lineAct._timeStart = actTime;

@@ -1058,6 +1058,15 @@ L.Map = L.Evented.extend({
 		return this.options.crs.pointToLatLng(L.point(point), zoom);
 	},
 
+	// rescaling
+
+	rescale: function(point, oldZoom, newZoom) {
+		oldZoom = oldZoom === undefined ? this.getZoom() : oldZoom;
+		newZoom = newZoom === undefined ? this.getZoom() : newZoom;
+
+		return this.options.crs.rescale(point, oldZoom, newZoom);
+	},
+
 	/**
 	 * Get LatLng coordinates after negating the X cartesian-coordinate.
 	 * This is useful in Calc RTL mode as mouse events have regular document
@@ -1180,7 +1189,7 @@ L.Map = L.Evented.extend({
 	},
 
 	// just set the keyboard state for mobile
-	// we dont want to change the focus, we know that keyboard is closed
+	// we don't want to change the focus, we know that keyboard is closed
 	// and we are just setting the state here
 	setAcceptInput: function (acceptInput) {
 		this._textInput._setAcceptInput(acceptInput);
@@ -1219,10 +1228,13 @@ L.Map = L.Evented.extend({
 		}
 		this.fire('statusindicator', {statusType: 'initializationcomplete'});
 		this.initComplete = true;
+
+		L.DomUtil.addClass(this._container, 'initialized');
 	},
 
 	_initContainer: function (id) {
 		var container = this._container = L.DomUtil.get(id);
+		L.DomUtil.removeClass(this._container, 'initialized');
 
 		if (!container) {
 			throw new Error('Map container not found.');
@@ -1433,6 +1445,13 @@ L.Map = L.Evented.extend({
 		}
 
 		app.idleHandler._activate();
+
+		if (app.definitions.CommentSection.needFocus)
+		{
+			app.definitions.CommentSection.needFocus.focus();
+			app.sectionContainer.getSectionWithName(L.CSections.CommentList.name).select(app.needFocus)
+			app.definitions.CommentSection.needFocus = null;
+		}
 	},
 
 	// Event to change the focus to dialog or editor.
