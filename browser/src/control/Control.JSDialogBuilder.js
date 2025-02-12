@@ -420,7 +420,7 @@ L.Control.JSDialogBuilder = L.Control.extend({
 			for (var i = 0; i < handlers.length; ++i) {
 				var event = handlers[i].event;
 				var handler = handlers[i].handler;
-				if (!L.isEmpty(event) && handler) {
+				if (!app.util.isEmpty(event) && handler) {
 					if (event === 'click') {
 						var eventData = {
 							id: controlElement.id
@@ -608,7 +608,7 @@ L.Control.JSDialogBuilder = L.Control.extend({
 		}
 		if (iconURL) {
 			var icon = L.DomUtil.create('img', 'menu-entry-icon', leftDiv);
-			L.LOUtil.setImage(icon, iconURL, builder.map);
+			app.LOUtil.setImage(icon, iconURL, builder.map);
 			icon.alt = '';
 			titleClass = 'menu-entry-with-icon';
 
@@ -814,12 +814,12 @@ L.Control.JSDialogBuilder = L.Control.extend({
 		$(sectionTitle).css('justify-content', 'space-between');
 
 		var commandName = dataid;
-		if (commandName && commandName.length && L.LOUtil.existsIconForCommand(commandName, builder.map.getDocType())) {
+		if (commandName && commandName.length && app.LOUtil.existsIconForCommand(commandName, builder.map.getDocType())) {
 			var iconName = builder._generateMenuIconName(commandName);
 			var iconSpan = L.DomUtil.create('span', 'menu-entry-icon ' + iconName, sectionTitle);
 			iconName = builder._createIconURL(iconName, true);
 			icon = L.DomUtil.create('img', '', iconSpan);
-			L.LOUtil.setImage(icon, iconName, builder.map);
+			app.LOUtil.setImage(icon, iconName, builder.map);
 			icon.alt = '';
 			var titleSpan2 = L.DomUtil.create('span', 'menu-entry-with-icon flex-fullwidth', sectionTitle);
 			titleSpan2.innerHTML = title;
@@ -1541,7 +1541,7 @@ L.Control.JSDialogBuilder = L.Control.extend({
 		} else if (data.symbol) {
 			L.DomUtil.addClass(pushbutton, 'has-img d-flex align-content-center justify-content-center align-items-center');
 			image = L.DomUtil.create('img', '', pushbutton);
-			L.LOUtil.setImage(image, 'symbol_' + data.symbol + '.svg', builder.map);
+			app.LOUtil.setImage(image, 'symbol_' + data.symbol + '.svg', builder.map);
 		} else {
 			pushbutton.innerText = pushbuttonText;
 			builder._stressAccessKey(pushbutton, pushbutton.accessKey);
@@ -1712,13 +1712,13 @@ L.Control.JSDialogBuilder = L.Control.extend({
 			if (image) {
 				image = image.substr(0, image.lastIndexOf('.'));
 				image = image.substr(image.lastIndexOf('/') + 1);
-				image = 'url("' + L.LOUtil.getImageURL(image + '.svg') + '")';
+				image = 'url("' + app.LOUtil.getImageURL(image + '.svg') + '")';
 			}
 
 			if (image64) {
 				image = 'url("' + image64 + '")';
 			}
-			L.LOUtil.checkIfImageExists(image);
+			app.LOUtil.checkIfImageExists(image);
 			elem = L.DomUtil.create('div', 'layout ' +
 				(data.entries[index].selected ? ' cool-context-down' : ''), parentContainer);
 			$(elem).data('id', data.entries[index].id);
@@ -1832,27 +1832,13 @@ L.Control.JSDialogBuilder = L.Control.extend({
 		return false;
 	},
 
-	_createComment: function(container, data, isRoot) {
+	_createComment: function(container, data) {
 		// Create annotation copy and add it into the container.
+		container.appendChild(data.annotation.sectionProperties.container);
 
-		var annotation = new app.definitions.Comment(data.data, data.id === 'new' ? {noMenu: true} : {}, this);
-		annotation.context = data.annotation.containerObject.context;
-		annotation.documentTopLeft = data.annotation.containerObject.documentTopLeft;
-		annotation.containerObject = data.annotation.containerObject;
-		annotation.sectionProperties.section = annotation;
-		annotation.sectionProperties.commentListSection = data.annotation.sectionProperties.commentListSection;
-		annotation.onInitialize();
-
-		if (app.isCommentEditingAllowed())
-			annotation.sectionProperties.menu.isRoot = isRoot;
-
-		container.appendChild(annotation.sectionProperties.container);
-
-		annotation.show();
-		annotation.update();
-		annotation.setExpanded();
-		annotation.hideMarker();
-		annotation.sectionProperties.annotationMarker = null;
+		data.annotation.show();
+		data.annotation.update();
+		data.annotation.setExpanded();
 	},
 
 	_rootCommentControl: function(parentContainer, data, builder) {
@@ -1874,7 +1860,7 @@ L.Control.JSDialogBuilder = L.Control.extend({
 
 		container.annotation = data.annotation;
 		container.id = data.id;
-		builder._createComment(container, data, true);
+		builder._createComment(container, data);
 		if (data.children.length > 1 && mainContainer.id !== 'comment-thread' + data.id)
 		{
 			var numberOfReplies = data.children.length - 1;
@@ -1960,7 +1946,7 @@ L.Control.JSDialogBuilder = L.Control.extend({
 		L.DomUtil.addClass(parentContainer, 'content-has-no-comments');
 		var emptyCommentWizard = L.DomUtil.create('figure', 'empty-comment-wizard-container', parentContainer);
 		var imgNode = L.DomUtil.create('img', 'empty-comment-wizard-img', emptyCommentWizard);
-		L.LOUtil.setImage(imgNode, 'lc_showannotations.svg', builder.map);
+		app.LOUtil.setImage(imgNode, 'lc_showannotations.svg', builder.map);
 		imgNode.alt = data.text;
 
 		var textNode = L.DomUtil.create('figcaption', 'empty-comment-wizard', emptyCommentWizard);
@@ -2053,6 +2039,7 @@ L.Control.JSDialogBuilder = L.Control.extend({
 			'scalignmentpropertypanel': 'aligntop',
 			'hyperlinkdialog': 'inserthyperlink',
 			'remotelink': 'inserthyperlink',
+			'remoteaicontent': 'sdrespageobjs',
 			'openhyperlinkoncursor': 'inserthyperlink',
 			'pageformatdialog': 'pagedialog',
 			'backgroundcolor': 'fillcolor',
@@ -2300,7 +2287,7 @@ L.Control.JSDialogBuilder = L.Control.extend({
 			else if (hasImage !== false){
 				if (data.icon) {
 					buttonImage = L.DomUtil.create('img', '', button);
-					this._isStringCloseToURL(data.icon) ? buttonImage.src = data.icon : L.LOUtil.setImage(buttonImage, data.icon, builder.map);
+					this._isStringCloseToURL(data.icon) ? buttonImage.src = data.icon : app.LOUtil.setImage(buttonImage, data.icon, builder.map);
 				}
 				else if (data.image) {
 					buttonImage = L.DomUtil.create('img', '', button);
@@ -2308,7 +2295,7 @@ L.Control.JSDialogBuilder = L.Control.extend({
 				}
 				else {
 					buttonImage = L.DomUtil.create('img', '', button);
-					L.LOUtil.setImage(buttonImage, builder._createIconURL(data.command), builder.map);
+					app.LOUtil.setImage(buttonImage, builder._createIconURL(data.command), builder.map);
 				}
 			} else {
 				buttonImage = false;
@@ -2325,7 +2312,6 @@ L.Control.JSDialogBuilder = L.Control.extend({
 			} else if (builder.options.useInLineLabelsForUnoButtons === true) {
 				$(div).addClass('no-label');
 			} else {
-				builder.map.uiManager.enableTooltip(div);
 				$(div).addClass('no-label');
 			}
 
@@ -2360,10 +2346,12 @@ L.Control.JSDialogBuilder = L.Control.extend({
 					if (state && state === 'true') {
 						$(button).addClass('selected');
 						$(div).addClass('selected');
+						button.setAttribute('aria-pressed', true);
 					}
 					else {
 						$(button).removeClass('selected');
 						$(div).removeClass('selected');
+						button.setAttribute('aria-pressed', false);
 					}
 
 					if (disabled)
@@ -2393,11 +2381,13 @@ L.Control.JSDialogBuilder = L.Control.extend({
 			var selectFn = function() {
 				L.DomUtil.addClass(button, 'selected');
 				L.DomUtil.addClass(div, 'selected');
+				button.setAttribute('aria-pressed', true);
 			};
 
 			var unSelectFn = function() {
 				L.DomUtil.removeClass(button, 'selected');
 				L.DomUtil.removeClass(div, 'selected');
+				button.setAttribute('aria-pressed', false);
 			};
 
 			div.onSelect = selectFn;
@@ -2421,11 +2411,18 @@ L.Control.JSDialogBuilder = L.Control.extend({
 			$(div).addClass('has-dropdown');
 			var arrowbackground = L.DomUtil.create('div', 'arrowbackground', div);
 			L.DomUtil.create('i', 'unoarrow', arrowbackground);
+			arrowbackground.tabIndex = '0';
 			controls['arrow'] = arrowbackground;
-			$(arrowbackground).click(function (event) {
-				if (!div.hasAttribute('disabled')) {
-					builder.callback('toolbox', 'openmenu', parentContainer, data.command, builder);
-					event.stopPropagation();
+
+			// Attach event listeners for both 'click' and 'keydown'
+			arrowbackground.addEventListener('click', function (event) {
+				openToolBoxMenu(event, div);
+			});
+			arrowbackground.addEventListener('keydown', function (event) {
+				switch (event.key) {
+					case 'Enter':
+						openToolBoxMenu(event, div);
+						break;
 				}
 			});
 
@@ -2433,6 +2430,13 @@ L.Control.JSDialogBuilder = L.Control.extend({
 				builder.callback('toolbox', 'closemenu', parentContainer, data.command, builder);
 			};
 		}
+
+		var openToolBoxMenu = function(event, div) {
+			if (!div.hasAttribute('disabled')) {
+				builder.callback('toolbox', 'openmenu', parentContainer, data.command, builder);
+				event.stopPropagation();
+			}
+		};
 
 		var clickFunction = function (e) {
 			if (!div.hasAttribute('disabled')) {
@@ -2460,7 +2464,7 @@ L.Control.JSDialogBuilder = L.Control.extend({
 
 		$(controls.button).on('click', clickFunction);
 		$(controls.label).on('click', clickFunction);
-		// We need a way to also handle the cutom tooltip for any tool button like save in shortcut bar
+		// We need a way to also handle the custom tooltip for any tool button like save in shortcut bar
 		if (data.isCustomTooltip) {
 			this._handleCutomTooltip(div, builder);
 		}
@@ -2667,12 +2671,12 @@ L.Control.JSDialogBuilder = L.Control.extend({
 
 		var icon = null;
 		var commandName = data.command && data.command.startsWith('.uno:') ? data.command.substring('.uno:'.length) : data.id;
-		if (commandName && commandName.length && L.LOUtil.existsIconForCommand(commandName, builder.map.getDocType())) {
+		if (commandName && commandName.length && app.LOUtil.existsIconForCommand(commandName, builder.map.getDocType())) {
 			var iconName = builder._generateMenuIconName(commandName);
 			var iconSpan = L.DomUtil.create('span', 'menu-entry-icon ' + iconName, menuEntry);
 			iconName = builder._createIconURL(iconName, true);
 			icon = L.DomUtil.create('img', '', iconSpan);
-			L.LOUtil.setImage(icon, iconName, builder.map);
+			app.LOUtil.setImage(icon, iconName, builder.map);
 			icon.alt = '';
 		}
 		if (data.checked && data.checked === true) {
@@ -2977,9 +2981,9 @@ L.Control.JSDialogBuilder = L.Control.extend({
 			control.style.gridColumn = 'span ' + parseInt(data.width);
 		}
 
-
 		// natural tab-order when using keyboard navigation
 		if (control && !control.hasAttribute('tabIndex')
+			&& control.querySelectorAll('[tabindex]').length === 0
 			&& data.type !== 'container'
 			&& data.type !== 'tabpage'
 			&& data.type !== 'tabcontrol'

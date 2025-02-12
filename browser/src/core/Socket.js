@@ -63,6 +63,7 @@ app.definitions.Socket = L.Class.extend({
 		} else	{
 			try {
 				this.socket = window.createWebSocket(this.getWebSocketBaseURI(map));
+				window.socket = this.socket;
 			} catch (e) {
 				this._map.fire('error', {msg: _('Oops, there is a problem connecting to {productname}: ').replace('{productname}', (typeof brandProductName !== 'undefined' ? brandProductName : 'Collabora Online Development Edition (unbranded)')) + e, cmd: 'socket', kind: 'failed', id: 3});
 				return;
@@ -255,6 +256,8 @@ app.definitions.Socket = L.Class.extend({
 		this._map.uiManager.initDarkBackgroundUI(darkBackground);
 
 		msg += ' accessibilityState=' + window.getAccessibilityState();
+
+		msg += ' clientvisiblearea=' + window.makeClientVisibleArea();
 
 		this._doSend(msg);
 		for (var i = 0; i < this._msgQueue.length; i++) {
@@ -756,7 +759,7 @@ app.definitions.Socket = L.Class.extend({
 			versionContainer.replaceChildren();
 			versionContainer.appendChild(document.createTextNode(lokitVersionObj.ProductName + '\xA0' + lokitVersionObj.ProductVersion + lokitVersionObj.ProductExtension));
 
-			h = lokitVersionObj.BuildId.substring(0, 7);
+			h = lokitVersionObj.BuildId.substring(0, 10);
 			if (parseInt(h,16).toString(16) === h.toLowerCase().replace(/^0+/, '')) {
 				const anchor = document.createElement('a');
 				anchor.setAttribute('target', '_blank');
@@ -1214,7 +1217,7 @@ app.definitions.Socket = L.Class.extend({
 				this._map.fire('infobar',
 					{
 						msg: textMsg,
-						action: L.Util.getProduct(),
+						action: app.util.getProduct(),
 						actionLabel: errorMessages.infoandsupport
 					});
 			}
@@ -1348,7 +1351,7 @@ app.definitions.Socket = L.Class.extend({
 				this._map.fire('statusindicator', info);
 				this._map._fireInitComplete('statusindicatorfinish');
 				// show shutting down popup after saving is finished
-				// if we show the popup just after the shuttingdown messsage, it will be overwitten by save popup
+				// if we show the popup just after the shuttingdown message, it will be overwitten by save popup
 				if (app.idleHandler._serverRecycling) {
 					this._map.showBusy(_('Server is shutting down'), false);
 				}
@@ -1361,6 +1364,9 @@ app.definitions.Socket = L.Class.extend({
 		}
 		else if (textMsg.startsWith('hyperlinkclicked:')) {
 			this._onHyperlinkClickedMsg(textMsg);
+		}
+		else if (textMsg.startsWith('browsersetting:')) {
+			window.prefs._initializeBrowserSetting(textMsg);
 		}
 
 		if (textMsg.startsWith('downloadas:')) {
@@ -1427,7 +1433,7 @@ app.definitions.Socket = L.Class.extend({
 			callbackList.push({ id: 'save-to-new-file', func_: function() {
 				var filename = this._map['wopi'].BaseFileName;
 				if (filename) {
-					filename = L.LOUtil.generateNewFileName(filename, '_new');
+					filename = app.LOUtil.generateNewFileName(filename, '_new');
 					this._map.saveAs(filename);
 				}
 			}.bind(this)});
@@ -1529,6 +1535,17 @@ app.definitions.Socket = L.Class.extend({
 			// initialize and append text input before doc layer
 			this._map.initTextInput(command.type);
 
+			// Reinitialize the menubar and top toolbar if browser settings are enabled.
+			// During the initial `initializeBasicUI` call, we don't know if compact mode is enabled.
+			// Before `doclayerinit`, we recheck the compact mode setting and if conditions are met,
+			// add the top toolbar and menubar controls to the map.
+			if (window.prefs.useBrowserSetting) {
+				if (!window.mode.isMobile() && this._map.uiManager.getCurrentMode() === 'notebookbar')
+					this._map.uiManager.removeClassicUI();
+				else if (!this._map.menubar)
+					this._map.uiManager.initializeMenubarAndTopToolbar();
+			}
+
 			// first status message, we need to create the document layer
 			var tileWidthTwips = this._map.options.tileWidthTwips;
 			var tileHeightTwips = this._map.options.tileHeightTwips;
@@ -1577,8 +1594,7 @@ app.definitions.Socket = L.Class.extend({
 			this._map.setPermission(app.file.permission);
 			window.migrating = false;
 			this._map.uiManager.initializeSidebar();
-			if (typeof window.initializedUI === 'function')
-				window.initializedUI();
+			this._map.uiManager.refreshTheme();
 		}
 
 		this._map.fire('docloaded', {status: true});
@@ -1603,7 +1619,7 @@ app.definitions.Socket = L.Class.extend({
 	_onJSDialog: function(textMsg, callback) {
 		var msgData = JSON.parse(textMsg.substring('jsdialog:'.length + 1));
 
-		if (msgData.children && !L.Util.isArray(msgData.children)) {
+		if (msgData.children && !app.util.isArray(msgData.children)) {
 			window.app.console.warn('_onJSDialogMsg: The children\'s data should be created of array type');
 			return;
 		}
