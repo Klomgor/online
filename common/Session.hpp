@@ -280,9 +280,15 @@ public:
 
     const std::string& getSpellOnline() const { return _spellOnline; }
 
+    void setSpellOnline(const std::string& val) { _spellOnline = val; }
+
     const std::string& getDarkTheme() const { return _darkTheme; }
 
+    void setDarkTheme(const std::string& val) { _darkTheme = val; }
+
     const std::string& getDarkBackground() const { return _darkBackground; }
+
+    void setDarkBackground(const std::string& val) { _darkBackground = val; }
 
     const std::string& getBatchMode() const { return _batch; }
 
@@ -290,7 +296,11 @@ public:
 
     const std::string& getMacroSecurityLevel() const { return _macroSecurityLevel; }
 
+    const std::string& getInitialClientVisibleArea() const { return _initialClientVisibleArea; }
+
     bool getAccessibilityState() const { return _accessibilityState; }
+
+    void setAccessibilityState(bool val) { _accessibilityState = val; }
 
     void disableSpellCheckIfReadOnly();
 
@@ -427,6 +437,8 @@ private:
 
     /// Level of Macro security.
     std::string _macroSecurityLevel;
+
+    std::string _initialClientVisibleArea;
 
     /// Specifies whether accessibility support is enabled for this session.
     bool _accessibilityState;

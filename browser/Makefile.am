@@ -50,11 +50,12 @@ QUIET_ECHO_ = $(QUIET_ECHO_$(AM_DEFAULT_VERBOSITY))
 QUIET_ECHO_0 = @echo "  ECHO    " $@;
 
 MOCHA_DIR = $(srcdir)/mocha_tests
+MOCHA_JS_DIR = $(MOCHA_DIR)/workdir
 MOCHA_TS_FILES = $(wildcard $(MOCHA_DIR)/*.ts)
-MOCHA_TS_JS_FILES := $(MOCHA_TS_FILES:.ts=.js)
+MOCHA_TS_JS_FILES = $(patsubst $(MOCHA_DIR)/%.ts,$(MOCHA_JS_DIR)/%.js,$(MOCHA_TS_FILES))
 # tsc can report a failure, but still create a .js and a second make attempt will succeed,
 # so if this returns an error then delete the target
-$(MOCHA_TS_JS_FILES): %.js: %.ts
+$(MOCHA_JS_DIR)/%.js: $(MOCHA_DIR)/%.ts
 	$(QUIET_TSC) $(builddir)/node_modules/typescript/bin/tsc $< --outfile $@ --module none --lib dom,es2016 --target ES5 || (rm -f $@ && false)
 
 JQUERY_LIGHTNESS_IMAGE_PATH = $(srcdir)/images/jquery-ui-lightness
@@ -114,8 +115,9 @@ define npm_source
 	done
 endef
 
-COOL_ADMIN_TS =\
-	admin/src/ModalDialogCreator.ts
+COOL_ADMIN_TS = \
+	admin/src/ModalDialogCreator.ts \
+	admin/src/integrator/AdminIntegratorSettings.ts
 
 COOL_ADMIN_TS_JS = $(patsubst %.ts,$(TYPESCRIPT_JS_DIR)/%.js,$(COOL_ADMIN_TS))
 
@@ -233,19 +235,19 @@ COOL_JS_LST =\
 	src/app/DocEvents.ts \
 	src/app/GraphicSelectionMiddleware.ts \
 	src/app/SearchService.ts \
+	src/app/Rectangle.ts \
+	src/app/Util.ts \
+	src/app/LOUtil.ts \
 	src/Leaflet.js \
 	src/errormessages.js \
 	src/unocommands.js \
 	src/UNO/Key.js \
 	src/core/Log.js \
 	src/core/Util.js \
-	src/core/LOUtil.js \
 	src/core/geometry.ts \
-	src/core/Rectangle.ts \
 	src/core/Class.js \
 	src/core/Events.js \
 	src/core/Socket.js \
-	src/core/Matrix.js \
 	src/core/Debug.js \
 	src/geometry/Point.ts \
 	src/geometry/Bounds.ts \
@@ -265,6 +267,8 @@ COOL_JS_LST =\
 	src/canvas/CanvasSectionProps.js \
 	src/canvas/CanvasSectionContainer.ts \
 	src/canvas/CanvasSectionObject.ts \
+	src/canvas/sections/HTMLObjectSection.ts \
+	src/canvas/sections/CommentMarkerSubSection.ts \
 	src/canvas/sections/CommentSection.ts \
 	src/canvas/sections/CommentListSection.ts \
 	src/canvas/sections/CalcGridSection.ts \
@@ -273,7 +277,6 @@ COOL_JS_LST =\
 	src/canvas/sections/PreloadMapSection.ts \
 	src/canvas/sections/TilesSection.ts \
 	src/canvas/sections/AutoFillMarkerSection.ts \
-	src/canvas/sections/HTMLObjectSection.ts \
 	src/canvas/sections/URLPopUpSection.ts \
 	src/canvas/sections/InvalidationRectangleSection.ts \
 	src/canvas/sections/ShapeHandlesSection.ts \
@@ -312,6 +315,7 @@ COOL_JS_LST =\
 	src/layer/tile/ImpressTileLayer.js \
 	src/layer/tile/CalcTileLayer.js \
 	src/canvas/sections/CursorHeaderSection.ts \
+	src/canvas/sections/ContentControlDropdownSubSection.ts \
 	src/canvas/sections/ContentControlSection.ts \
 	src/layer/marker/ProgressOverlay.js \
 	src/layer/marker/TextInput.js \
@@ -460,14 +464,16 @@ COOL_JS_LST =\
 	src/control/Parts.js \
 	src/control/Scroll.js \
 	src/control/Styles.js \
-	src/control/Ruler.js \
+	src/control/Ruler.ts \
 	src/control/VRuler.ts \
+	src/control/HRuler.ts \
 	src/slideshow/SlideCache.ts \
 	src/slideshow/SlideCompositor.ts \
 	src/slideshow/LayerRenderer.ts \
 	src/slideshow/LayerDrawing.ts \
 	src/slideshow/LayersCompositor.ts \
 	src/slideshow/RenderContext.ts \
+	src/slideshow/VideoRenderer.ts \
 	src/slideshow/SlideRenderer.ts \
 	src/slideshow/SlideShowPresenter.ts \
 	src/slideshow/PresenterConsole.js \
@@ -947,6 +953,7 @@ pot:
 		admin/src/Util.js \
 		js/global.js \
 		src/canvas/sections/CommentListSection.ts \
+		src/canvas/sections/CommentMarkerSubSection.ts \
 		src/canvas/sections/CommentSection.ts \
 		src/canvas/sections/ShapeHandlesSection.ts \
 		src/canvas/sections/URLPopUpSection.ts \
@@ -992,10 +999,11 @@ pot:
 		src/control/Control.Zotero.js \
 		src/control/Parts.js \
 		src/control/Permission.js \
-		src/control/Ruler.js \
 		src/control/Signing.js \
 		src/control/Toolbar.js \
+		src/control/Ruler.ts \
 		src/control/VRuler.ts \
+		src/control/HRuler.ts \
 		src/control/jsdialog/Definitions.Menu.ts \
 		src/control/jsdialog/Util.SnackbarController.ts \
 		src/control/jsdialog/Widget.ColorPicker.ts \

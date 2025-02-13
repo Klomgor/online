@@ -546,7 +546,7 @@ L.Clipboard = L.Class.extend({
 		return text;
 	},
 
-	// returns whether we shold stop processing the event
+	// returns whether we should stop processing the event
 	populateClipboard: function(ev) {
 		// If the copy paste API is not supported, we download the content as a fallback method.
 		var text = this._getHtmlForClipboard();
@@ -1205,7 +1205,7 @@ L.Clipboard = L.Class.extend({
 	// sets the selection to some (cell formula) text)
 	setTextSelectionText: function(text) {
 		// Usually 'text' is what we see in the formulabar
-		// In case of actual formula we don't wish to put forumla into client clipboard
+		// In case of actual formula we don't wish to put formula into client clipboard
 		// Putting formula in clipboard means user will paste formula outside of online
 		// Pasting inside online is handled by internal paste
 		if (this._map.getDocType() === 'spreadsheet' && text.startsWith('=')) {
@@ -1277,7 +1277,7 @@ L.Clipboard = L.Class.extend({
 			innerDiv.appendChild(p);
 		}
 		else {
-			const ctrlText = L.Util.replaceCtrlAltInMac('Ctrl');
+			const ctrlText = app.util.replaceCtrlAltInMac('Ctrl');
 			const p = document.createElement('p');
 			p.textContent = 'Your browser has very limited access to the clipboard, so use these keyboard shortcuts:';
 			innerDiv.appendChild(p);
@@ -1358,7 +1358,7 @@ L.Clipboard = L.Class.extend({
 		var innerDiv = L.DomUtil.create('div', '', null);
 		box.insertBefore(innerDiv, box.firstChild);
 
-		const ctrlText = L.Util.replaceCtrlAltInMac('Ctrl');
+		const ctrlText = app.util.replaceCtrlAltInMac('Ctrl');
 
 		let p = document.createElement('p');
 		p.textContent = _('Your browser has very limited access to the clipboard');

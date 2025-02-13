@@ -53,6 +53,14 @@ extern "C"
 }
 #endif
 
+#if defined(__COVERITY__)
+#define THREAD_UNSAFE_DUMP_BEGIN _Pragma("coverity compliance block deviate MISSING_LOCK \"Intentionally thread-unsafe dumping\"")
+#define THREAD_UNSAFE_DUMP_END _Pragma("coverity compliance end_block MISSING_LOCK")
+#else
+#define THREAD_UNSAFE_DUMP_BEGIN
+#define THREAD_UNSAFE_DUMP_END
+#endif
+
 /// Format seconds with the units suffix until we migrate to C++20.
 inline std::ostream& operator<<(std::ostream& os, const std::chrono::seconds& s)
 {
@@ -1352,7 +1360,14 @@ int main(int argc, char**argv)
      * Avoid using the configuration layer and rely on defaults which is only useful for special
      * test tool targets (typically fuzzing) where start-up speed is critical.
      */
-    bool isFuzzing();
+    constexpr bool isFuzzing()
+    {
+#if LIBFUZZER
+        return true;
+#else
+        return false;
+#endif
+    }
 
     constexpr bool isMobileApp()
     {

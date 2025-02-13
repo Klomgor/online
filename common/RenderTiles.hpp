@@ -162,7 +162,7 @@ namespace RenderTiles
                            mode);
 
             // FIXME: prettify this.
-            bool forceKeyframe = tiles[tileIndex].getOldWireId() == 0;
+            bool forceKeyframe = tiles[tileIndex].isForcedKeyFrame();
 
             // FIXME: share the same wireId for all tiles concurrently rendered.
             TileWireId wireId = getCurrentWireId(true);
@@ -265,7 +265,7 @@ namespace RenderTiles
             }
         }
 
-        // Should we do this more frequently? and/orshould we defer it?
+        // Should we do this more frequently? and/or should we defer it?
         deltaGen.rebalanceDeltas();
         return true;
     }

@@ -13,11 +13,20 @@ describe(['tagdesktop'], 'Top toolbar tests.', function() {
 		calcHelper.clickOnFirstCell();
 	});
 
-	it('Save.', function() {
+	it('Save.', function () {
 		cy.cGet('#bold').click();
 		cy.cGet('#save').click();
 
 		helper.reloadDocument(newFilePath);
+
+		cy.cGet(helper.addressInputSelector)
+		.should('exist');
+
+		desktopHelper.switchUIToCompact();
+		calcHelper.clickOnFirstCell();
+
+		cy.cGet(helper.addressInputSelector)
+			.should('exist');
 
 		helper.setDummyClipboardForCopy();
 		calcHelper.selectEntireSheet();
@@ -60,6 +69,7 @@ describe(['tagdesktop'], 'Top toolbar tests.', function() {
 	});
 
 	it('Enable text wrapping.', function() {
+		cy.cGet(helper.addressInputSelector).should('have.prop', 'value', 'A1');
 		// Get cursor position at end of line before wrap
 		calcHelper.dblClickOnFirstCell();
 		helper.moveCursor('end');
@@ -255,7 +265,7 @@ describe(['tagdesktop'], 'Top toolbar tests.', function() {
 	it('Apply left/right alignment', function() {
 		helper.setDummyClipboardForCopy();
 		cy.cGet('#toolbar-up .ui-scroll-right').click();
-		// Set right aligment first
+		// Set right alignment first
 		cy.cGet('#textalign .arrowbackground').click();
 		cy.cGet('body').contains('.ui-combobox-entry', 'Align Right').click();
 		calcHelper.selectEntireSheet();

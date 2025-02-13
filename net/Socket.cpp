@@ -59,6 +59,7 @@
 #include <wasm/base64.hpp>
 #include <common/ConfigUtil.hpp>
 #include <common/Unit.hpp>
+#include <common/Util.hpp>
 
 // Bug in pre C++17 where static constexpr must be defined. Fixed in C++17.
 constexpr std::chrono::microseconds SocketPoll::DefaultPollTimeoutMicroS;
@@ -619,7 +620,7 @@ int SocketPoll::poll(int64_t timeoutMaxMicroS)
                 // re-entrancy hazard
                 LOG_DBG("Unexpected socket poll resize");
             }
-            else if (!_pollSockets[i] || _pollSockets[i]->getFD() < 0)
+            else if (!_pollSockets[i])
             {
                 // removed in a callback
                 ++itemsErased;
@@ -673,10 +674,11 @@ int SocketPoll::poll(int64_t timeoutMaxMicroS)
             LOG_TRC("Scanning to removing " << itemsErased << " defunct sockets from "
                     << _pollSockets.size() << " sockets");
 
-            _pollSockets.erase(std::remove_if(_pollSockets.begin(), _pollSockets.end(),
-                                              [](const std::shared_ptr<Socket>& s) -> bool
-                                              { return !s || s->getFD() < 0; }),
-                               _pollSockets.end());
+            _pollSockets.erase(
+                std::remove_if(_pollSockets.begin(), _pollSockets.end(),
+                    [](const std::shared_ptr<Socket>& s)->bool
+                    { return !s; }),
+                _pollSockets.end());
         }
     }
 
@@ -702,7 +704,7 @@ void SocketPoll::closeAllSockets()
     for (std::shared_ptr<Socket> &it : _pollSockets)
     {
         // first close the underlying socket
-        ::close(it->getFD());
+        it->closeFD(*this);
 
         // avoid the socketHandler' getting an onDisconnect
         auto stream = dynamic_cast<StreamSocket *>(it.get());
@@ -1062,8 +1064,9 @@ bool StreamSocket::sendAndShutdown(http::Response& response)
 
 void SocketPoll::dumpState(std::ostream& os) const
 {
+    THREAD_UNSAFE_DUMP_BEGIN
     // FIXME: NOT thread-safe! _pollSockets is modified from the polling thread!
-    const auto pollSockets = _pollSockets;
+    const std::vector<std::shared_ptr<Socket>> pollSockets = _pollSockets;
 
     os << "\n  SocketPoll [" << name() << "] with " << pollSockets.size() << " socket"
        << (pollSockets.size() == 1 ? "" : "s") << " - wakeup rfd: " << _wakeup[0]
@@ -1076,6 +1079,7 @@ void SocketPoll::dumpState(std::ostream& os) const
     for (const std::shared_ptr<Socket>& socket : pollSockets)
         socket->dumpState(os);
     os << "\n  Done [" << name() << "]\n";
+    THREAD_UNSAFE_DUMP_END
 }
 
 /// Returns true on success only.
@@ -1481,11 +1485,12 @@ bool StreamSocket::checkRemoval(std::chrono::steady_clock::time_point now)
             if (!isClosed())
             {
                 // Note: Ensure proper semantics of onDisconnect()
-                LOG_WRN("Socket still open post onDisconnect(), forcing shutdown");
+                LOG_WRN("Socket still open post onDisconnect(), forced shutdown.");
+                shutdown(); // signal
+                closeConnection(); // real -> setClosed()
             }
         }
-
-        if (!isClosed())
+        else
         {
             shutdown(); // signal
             closeConnection(); // real -> setClosed()

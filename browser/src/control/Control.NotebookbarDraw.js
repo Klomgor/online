@@ -13,7 +13,7 @@
  * L.Control.NotebookbarDraw - definition of notebookbar content in Draw
  */
 
-/* global _ _UNO */
+/* global _ _UNO app */
 L.Control.NotebookbarDraw = L.Control.NotebookbarImpress.extend({
 
 	getShortcutsBarData: function() {
@@ -648,7 +648,7 @@ L.Control.NotebookbarDraw = L.Control.NotebookbarImpress.extend({
 										'text': _UNO('.uno:FontworkGalleryFloater'),
 										'command': '.uno:FontworkGalleryFloater',
 										// Fontwork export/import not supported in other formats.
-										'visible': L.LOUtil.isFileODF(this._map) ? 'true' : 'false',
+										'visible': app.LOUtil.isFileODF(this._map) ? 'true' : 'false',
 										'accessibility': { focusBack: true, combination: 'FW', de: null }
 									},
 									{
@@ -997,7 +997,7 @@ L.Control.NotebookbarDraw = L.Control.NotebookbarImpress.extend({
 								{
 									'id': 'home-search-dialog',
 									'type': 'toolitem',
-									'text': _UNO('.uno:SearchDialog'),
+									'text': _('Replace'),
 									'command': '.uno:SearchDialog',
 									'accessibility': { focusBack: false, 	combination: 'FD',	de: null }
 								}
@@ -1241,7 +1241,7 @@ L.Control.NotebookbarDraw = L.Control.NotebookbarImpress.extend({
 								'id': 'insert-insert-table:InsertTableMenu',
 								'type': 'menubutton',
 								'noLabel': true,
-								'text': _UNO('.uno:InsertTable', 'presentation'),
+								'text': _('Table'),
 								'command': '.uno:InsertTable',
 								'accessibility': { focusBack: true, combination: 'IT', de: null }
 							}
@@ -1276,6 +1276,14 @@ L.Control.NotebookbarDraw = L.Control.NotebookbarImpress.extend({
 				'type': 'bigcustomtoolitem',
 				'text': _('Smart Picker'),
 				'command': 'remotelink',
+				'accessibility': { focusBack: true, combination: 'RL', de: null }
+			} : {},
+			(this._map['wopi'].EnableRemoteAIContent) ? {
+				'id': 'insert-insert-remote-ai-content',
+				'class': 'unoremoteaicontent',
+				'type': 'bigcustomtoolitem',
+				'text': _('Assistant'),
+				'command': 'remoteaicontent',
 				'accessibility': { focusBack: true, combination: 'RL', de: null }
 			} : {},
 			{
@@ -1393,7 +1401,7 @@ L.Control.NotebookbarDraw = L.Control.NotebookbarImpress.extend({
 								'text': _UNO('.uno:FontworkGalleryFloater'),
 								'command': '.uno:FontworkGalleryFloater',
 								// Fontwork export/import not supported in other formats.
-								'visible': L.LOUtil.isFileODF(this._map) ? 'true' : 'false',
+								'visible': app.LOUtil.isFileODF(this._map) ? 'true' : 'false',
 								'accessibility': { focusBack: true, combination: 'FG', de: null }
 							}
 						]

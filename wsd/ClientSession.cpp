@@ -13,12 +13,15 @@
 
 #include "ClientSession.hpp"
 
+#include <filesystem>
 #include <ios>
+#include <map>
 #include <sstream>
 #include <string>
 #include <string_view>
 #include <memory>
 #include <unordered_map>
+#include <cctype>
 
 #include <Poco/Base64Decoder.h>
 #include <Poco/Net/HTTPResponse.h>
@@ -40,6 +43,7 @@
 #include <common/CommandControl.hpp>
 #include <wsd/TileDesc.hpp>
 #include <net/HttpHelper.hpp>
+#include <wopi/StorageConnectionManager.hpp>
 
 using namespace COOLProtocol;
 
@@ -93,7 +97,8 @@ ClientSession::ClientSession(
     _isTextDocument(false),
     _thumbnailSession(false),
     _canonicalViewId(0),
-    _sentAudit(false)
+    _sentAudit(false),
+    _sentBrowserSetting(false)
 {
     const std::size_t curConnections = ++COOLWSD::NumConnections;
     LOG_INF("ClientSession ctor [" << getName() << "] for URI: [" << _uriPublic.toString()
@@ -113,6 +118,8 @@ ClientSession::ClientSession(
     TraceEvent::emitOneRecordingIfEnabled("{\"name\":\"thread_name\",\"ph\":\"M\",\"args\":{\"name\":\"JS\"},\"pid\":"
                                           + std::to_string(getpid() + SYNTHETIC_COOL_PID_OFFSET)
                                           + ",\"tid\":1},\n");
+
+    _browserSettingsJSON = new Poco::JSON::Object();
 }
 
 // Can't take a reference in the constructor.
@@ -1351,6 +1358,20 @@ bool ClientSession::_handleInput(const char *buffer, int length)
     {
         Admin::instance().routeTokenSanityCheck();
     }
+    else if (tokens.equals(0, "browsersetting") && tokens.size() >= 3)
+    {
+        std::string action;
+        std::string json;
+        getTokenString(tokens[1], "action", action);
+        if (action == "update")
+        {
+            std::string key;
+            std::string value;
+            getTokenString(tokens[2], "key", key);
+            getTokenString(tokens[3], "value", value);
+            COOLWSD::syncUsersBrowserSettings(getUserId(), key, value);
+        }
+    }
 #endif
     else
     {
@@ -1359,6 +1380,79 @@ bool ClientSession::_handleInput(const char *buffer, int length)
     }
 
     return false;
+}
+
+#if !MOBILEAPP
+void ClientSession::updateBrowserSettingsJSON(const std::string& key, const std::string& value)
+{
+    std::vector<std::string> vec = Util::splitStringToVector(key, '.');
+    if (vec.size() == 2)
+    {
+        const std::string& parentKey = vec[0];
+        const std::string& childKey = vec[1];
+        if (!childKey.empty() && !parentKey.empty())
+        {
+            Poco::JSON::Object::Ptr jsonObject;
+            if (_browserSettingsJSON->has(parentKey))
+                jsonObject = _browserSettingsJSON->getObject(parentKey);
+            else
+                jsonObject = new Poco::JSON::Object();
+
+            jsonObject->set(childKey, value);
+            _browserSettingsJSON->set(parentKey, jsonObject);
+        }
+    }
+    else
+    {
+        _browserSettingsJSON->set(key, value);
+    }
+}
+#endif
+
+void ClientSession::overrideDocOption()
+{
+    if (!_sentBrowserSetting)
+    {
+        LOG_DBG("Browser settings not fetched, skipping DocOption override.");
+        return;
+    }
+
+    std::string spellOnline, darkTheme, darkBackgroundForTheme, accessibilityState;
+    JsonUtil::findJSONValue(_browserSettingsJSON, "spellOnline", spellOnline);
+    JsonUtil::findJSONValue(_browserSettingsJSON, "darkTheme", darkTheme);
+    JsonUtil::findJSONValue(_browserSettingsJSON, "accessibilityState", accessibilityState);
+    Poco::JSON::Object::Ptr darkBackgroundObj =
+        _browserSettingsJSON->getObject("darkBackgroundForTheme");
+    if (!darkBackgroundObj.isNull())
+    {
+        JsonUtil::findJSONValue(darkBackgroundObj, darkTheme == "true" ? "dark" : "light",
+                                darkBackgroundForTheme);
+    }
+
+    if (!darkTheme.empty())
+    {
+        setDarkTheme(darkTheme);
+        LOG_DBG("Overriding parsed docOption darkTheme[" << darkTheme << ']');
+    }
+
+    if (!darkBackgroundForTheme.empty())
+    {
+        setDarkBackground(darkBackgroundForTheme);
+        LOG_DBG("Overriding parsed docOption darkBackgroundForTheme[" << darkBackgroundForTheme
+                                                                      << ']');
+    }
+
+    if (!spellOnline.empty())
+    {
+        setSpellOnline(spellOnline);
+        LOG_DBG("Overriding parsed docOption spellOnline[" << spellOnline << ']');
+    }
+
+    if (!accessibilityState.empty())
+    {
+        setAccessibilityState(accessibilityState == "true" ? true : false);
+        LOG_DBG("Overriding parsed docOption accessibilityState[" << accessibilityState << ']');
+    }
 }
 
 bool ClientSession::loadDocument(const char* /*buffer*/, int /*length*/,
@@ -1379,6 +1473,7 @@ bool ClientSession::loadDocument(const char* /*buffer*/, int /*length*/,
         std::string timestamp, doctemplate;
         int loadPart = -1;
         parseDocOptions(tokens, loadPart, timestamp, doctemplate);
+        overrideDocOption();
 
         std::ostringstream oss;
         oss << "load url=" << docBroker->getPublicUri().toString();
@@ -1494,6 +1589,11 @@ bool ClientSession::loadDocument(const char* /*buffer*/, int /*length*/,
         {
             oss << " macroSecurityLevel="
                 << ConfigUtil::getConfigValue<int>("security.macro_security_level", 1);
+        }
+
+        if (!getInitialClientVisibleArea().empty())
+        {
+            oss << " clientvisiblearea=" << getInitialClientVisibleArea();
         }
 
         if (ConfigUtil::getConfigValue<bool>("accessibility.enable", false))
@@ -2937,6 +3037,7 @@ void ClientSession::handleTileInvalidation(const std::string& message,
        _tileWidthTwips == 0 || _tileHeightTwips == 0 ||
        (_clientSelectedPart == -1 && !_isTextDocument))
     {
+        LOG_TRC("No visible area received yet - skip invalidation");
         return;
     }
 

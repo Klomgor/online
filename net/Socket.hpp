@@ -147,6 +147,7 @@ public:
         : _type(type)
         , _clientPort(0)
         , _fd(createSocket(type))
+        , _closed(_fd < 0)
         , _creationTime(creationTime)
         , _lastSeenTime(_creationTime)
         , _bytesSent(0)
@@ -158,6 +159,10 @@ public:
     virtual ~Socket()
     {
         LOG_TRC("Socket dtor");
+
+        // explicit closeFD called, or initial createSocket failure
+        if (_fd < 0)
+            return;
 
         // Doesn't block on sockets; no error handling needed.
         if constexpr (!Util::isMobileApp())
@@ -171,8 +176,8 @@ public:
         }
     }
 
-    /// Returns true iff this socket has been closed or is invalid.
-    bool isClosed() const { return _fd < 0; }
+    /// Returns true if this socket has been closed, i.e. rejected from polling and potentially shutdown
+    bool isClosed() const { return _closed; }
 
     constexpr Type type() const { return _type; }
     constexpr bool isIPType() const { return Type::IPv4 == _type || Type::IPv6 == _type; }
@@ -217,14 +222,14 @@ public:
     /// TODO: Support separate read/write shutdown.
     virtual void shutdown()
     {
-        if (!_noShutdown && !isClosed())
+        if (!_noShutdown)
         {
             LOG_TRC("Socket shutdown RDWR. " << *this);
+            setClosed();
             if constexpr (!Util::isMobileApp())
                 ::shutdown(_fd, SHUT_RDWR);
             else
                 fakeSocketShutdown(_fd);
-            setClosed(); // Invalidate the FD.
         }
     }
 
@@ -409,6 +414,18 @@ public:
         _ignoreInput = true;
     }
 
+    // arg to emphasize what is allowed do this
+    // close in advance of the ctor
+    void closeFD(const SocketPoll& /*rPoll*/)
+    {
+        ::close(_fd);
+        // Invalidate the FD by negating to preserve the original value.
+        if (_fd > 0)
+            _fd = -_fd;
+        else if (_fd == 0) // Unlikely, but technically possible.
+            _fd = -1;
+    }
+
 protected:
     /// Construct based on an existing socket fd.
     /// Used by accept() only.
@@ -417,6 +434,7 @@ protected:
         : _type(type)
         , _clientPort(0)
         , _fd(fd)
+        , _closed(_fd < 0)
         , _creationTime(creationTime)
         , _lastSeenTime(_creationTime)
         , _bytesSent(0)
@@ -436,14 +454,7 @@ protected:
     void setNoShutdown() { _noShutdown = true; }
 
     /// Explicitly marks this socket closed, i.e. rejected from polling and potentially shutdown
-    /// Note: to preserve the original FD post closing (f.e. in logs and debugger), we negate it.
-    void setClosed()
-    {
-        if (_fd > 0)
-            _fd = -_fd;
-        else if (_fd == 0) // Unlikely, but technically possible.
-            _fd = -1;
-    }
+    void setClosed() { _closed = true; }
 
     /// Explicitly marks this socket and the given SocketDisposition closed
     void setClosed(SocketDisposition &disposition) { setClosed(); disposition.setClosed(); }
@@ -470,7 +481,7 @@ private:
         if constexpr (!Util::isMobileApp())
         {
 #if ENABLE_DEBUG
-            if (std::getenv("COOL_ZERO_BUFFER_SIZE"))
+            if (std::getenv("COOL_ZERO_BUFFER_SIZE") && _fd >= 0)
             {
                 const int oldSize = getSocketBufferSize();
                 setSocketBufferSize(0);
@@ -483,7 +494,9 @@ private:
     std::string _clientAddress;
     const Type _type;
     unsigned int _clientPort;
-    int _fd; ///< The socket file-descriptor. Invalid/closed if < 0.
+    int _fd;
+    /// True if this socket is closed.
+    bool _closed;
 
     const std::chrono::steady_clock::time_point _creationTime;
     std::chrono::steady_clock::time_point _lastSeenTime;
@@ -1305,7 +1318,7 @@ public:
                     _inBuffer.append(&buf[0], len);
                 }
                 // else poll will handle errors.
-            } while (len == (sizeof(buf)));
+            } while (len == static_cast<ssize_t>(sizeof(buf)));
 
             // Restore errno from the read call.
             errno = last_errno;
