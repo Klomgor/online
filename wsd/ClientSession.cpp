@@ -262,6 +262,7 @@ bool ClientSession::matchesClipboardKeys(const std::string &/*viewId*/, const st
                        [&tag](const std::string& it) { return it == tag; });
 }
 
+// Rewrite path to be visible to the outside world
 static std::string getLocalPathToJail(std::string filePath, const DocumentBroker& docBroker)
 {
 #if !MOBILEAPP
@@ -271,7 +272,6 @@ static std::string getLocalPathToJail(std::string filePath, const DocumentBroker
         if (filePath.size() > 0 && filePath[0] == '/')
             filePath = filePath.substr(1);
 
-        // Rewrite path to be visible to the outside world.
         const Path path(FileUtil::buildLocalPathToJail(COOLWSD::EnableMountNamespaces,
                                                        docBroker.getJailRoot(),
                                                        filePath));
@@ -2537,7 +2537,7 @@ bool ClientSession::handleKitToClientMessage(const std::shared_ptr<Message>& pay
             else
             {
                 FileUtil::removeFile(jailClipFile);
-                jailClipFile = postProcessedClipFile;
+                jailClipFile = std::move(postProcessedClipFile);
             }
         }
 
@@ -2551,7 +2551,7 @@ bool ClientSession::handleKitToClientMessage(const std::shared_ptr<Message>& pay
             std::string cacheFile = COOLWSD::SavedClipboards->insertClipboard(_clipboardKeys, jailClipFile);
             if (cacheFile != jailClipFile)
             {
-                jailClipFile = cacheFile;
+                jailClipFile = std::move(cacheFile);
                 removeClipFile = false;
             }
         }
@@ -3476,13 +3476,14 @@ bool ClientSession::preProcessSetClipboardPayload(std::istream& in, std::ostream
     if (!Util::copyToMatch(in, out, "<div id=\"meta-origin\" data-coolorigin=\""))
         return false;
 
+    const std::string_view endtag = "\">\n";
     // discard this tag
-    if (!Util::seekToMatch(in, "\">\n"))
+    if (!Util::seekToMatch(in, endtag))
     {
         LOG_DBG("Found unbalanced starting meta <div> tag in setclipboard payload.");
         return false;
     }
-    in.seekg(3, std::ios_base::cur);
+    in.seekg(endtag.size(), std::ios_base::cur);
 
     if (!Util::copyToMatch(in, out, "</div></body>"))
     {
