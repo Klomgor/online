@@ -509,8 +509,8 @@ namespace
             }
         }
 
-        assert(fpath[strlen(sourceForLinkOrCopy.c_str())] == '/');
-        const char *relativeOldPath = fpath + strlen(sourceForLinkOrCopy.c_str()) + 1;
+        assert(fpath[sourceForLinkOrCopy.size()] == '/');
+        const char* relativeOldPath = fpath + sourceForLinkOrCopy.size() + 1;
         const Poco::Path newPath(destinationForLinkOrCopy, Poco::Path(relativeOldPath));
 
         switch (typeflag)
@@ -648,8 +648,8 @@ namespace
         }
 
         assert(path.size() >= sourceForGCDAFiles.size());
-        assert(fpath[strlen(sourceForGCDAFiles.c_str())] == '/');
-        const char* relativeOldPath = fpath + strlen(sourceForGCDAFiles.c_str()) + 1;
+        assert(fpath[sourceForGCDAFiles.size()] == '/');
+        const char* relativeOldPath = fpath + sourceForGCDAFiles.size() + 1;
         const Poco::Path newPath(destForGCDAFiles, Poco::Path(relativeOldPath));
 
         switch (typeflag)
@@ -2210,6 +2210,11 @@ std::shared_ptr<lok::Document> Document::load(const std::shared_ptr<ChildSession
     invalidateCanonicalId(session->getId());
 
     return _loKitDocument;
+}
+
+int Document::getViewsCount() const
+{
+    return _loKitDocument ? _loKitDocument->getViewsCount() : 0;
 }
 
 bool Document::forwardToChild(const std::string_view prefix, const std::vector<char>& payload)
@@ -4186,7 +4191,6 @@ bool globalPreinit(const std::string &loTemplate)
 
     // Disable problematic components that may be present from a
     // desktop or developer's install if env. var not set.
-    ::setenv("DISABLE_SYSTEM_DEPENDENT_PRIMITIVE_RENDERER", "1", 1);
     ::setenv("UNODISABLELIBRARY",
              "abp avmediagst avmediavlc cmdmail losessioninstall OGLTrans PresenterScreen "
              "syssh ucpftp1 ucpgio1 ucpimage updatecheckui updatefeed updchk"

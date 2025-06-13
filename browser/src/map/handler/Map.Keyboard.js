@@ -430,7 +430,6 @@ L.Map.Keyboard = L.Handler.extend({
 
 					this._map.deselectAll();
 					this._map.setPart(partToSelect);
-					this._map._docLayer._preview.focusCurrentSlide();
 					if (app.file.fileBasedView)
 						this._map._docLayer._checkSelectedPart();
 				}
@@ -448,6 +447,10 @@ L.Map.Keyboard = L.Handler.extend({
 					this._map.setPart(0);
 				else if (!ev.altKey && ev.keyCode === this.keyCodes.END)
 					this._map.setPart(this._map._docLayer._parts - 1);
+				else {
+					this._handleCtrlCommand(ev);
+					return;
+				}
 			}
 			else {
 				this._map._docLayer._preview.partsFocused = false;
@@ -843,7 +846,9 @@ L.Map.Keyboard = L.Handler.extend({
 		case this.keyCodes.LEFTWINDOWKEY[MAC]: // Left Cmd (Safari)
 		case this.keyCodes.RIGHTWINDOWKEY[MAC]: // Right Cmd (Safari)
 			// we prepare for a copy or cut event
-			this._map.focus();
+			// slide operations are handled differently avoid changing focus
+			if (!this._map._docLayer._preview.partsFocused)
+				this._map.focus();
 			// Not sure if the commented code is still used, so I didn't remove it.
 			// Anyhow, by when editable area is populated with the focused paragraph
 			// we can't select its content or on next editing the content is overwritten.
