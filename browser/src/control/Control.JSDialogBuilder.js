@@ -62,7 +62,11 @@ L.Control.JSDialogBuilder = L.Control.extend({
 	_currentDepth: 0,
 
 	rendersCache: {
-		fontnamecombobox: { persistent: true, images: [] }
+		fontnamecombobox: { persistent: true, images: [] },
+		layoutpanel_icons: { persistent: true, images: [] },
+		transitions_icons: { persistent: true, images: [] },
+		iconview_theme_colors: { persistent: true, images: [] },
+		ctlFavoriteswin: { persistent: true, images: [] },
 	}, // eg. custom renders for combobox entries
 
 	setWindowId: function (id) {
@@ -274,6 +278,8 @@ L.Control.JSDialogBuilder = L.Control.extend({
 			// encode spaces
 			var encodedCommand = data.replace(' ', '%20');
 			builder.map.sendUnoCommand(encodedCommand);
+			// perform post-processing
+			builder.map.fire('jsdialog' + eventType, { uno: data });
 		} else if (object) {
 			// CSV and Macro Security Warning Dialogs are shown before the document load
 			// In that state the document is not really loaded and closing or cancelling it
@@ -429,7 +435,7 @@ L.Control.JSDialogBuilder = L.Control.extend({
 	},
 
 	_stressAccessKey: function(element, accessKey) {
-		if (!accessKey || window.mode.isMobile())
+		if (!accessKey || window.mode.isMobile() || window.getAccessibilityState())
 			return;
 
 		var text = element.textContent;
@@ -2871,6 +2877,7 @@ L.Control.JSDialogBuilder = L.Control.extend({
 			&& data.type !== 'separator'
 			&& data.type !== 'spacer'
 			&& data.type !== 'edit'
+			&& data.type !== 'deck'
 			)
 			control.setAttribute('tabIndex', '0');
 	},

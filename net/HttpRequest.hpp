@@ -771,6 +771,13 @@ public:
         Util::joinPair(os, _header, indent + '\t');
     }
 
+    void setBasicAuth(std::string_view username, std::string_view password) {
+        std::string basicAuth{username};
+        basicAuth.append(":");
+        basicAuth.append(password);
+        _header.add("Authorization", "Basic " + Util::base64Encode(basicAuth));
+    }
+
 private:
     Header _header;
     std::string _url; ///< The URL to request, without hostname.
@@ -1013,9 +1020,14 @@ public:
     /// Append a chunk to the body. Must have Transfer-Encoding: chunked.
     void appendChunk(const std::string& chunk)
     {
+        _body.reserve(_body.size() + chunk.size() + 32);
+
         std::stringstream ss;
-        ss << std::hex << chunk.size() << "\r\n" << chunk << "\r\n";
+        ss << std::hex << chunk.size();
         _body.append(ss.str());
+        _body.append("\r\n");
+        _body.append(chunk);
+        _body.append("\r\n");
     }
 
     /// Handles incoming data (from the Server) in the Client.
@@ -1054,7 +1066,7 @@ public:
     }
 
     /// If not already in done state, finish with State::Error.
-    void finish()
+    void error()
     {
         // We expect to have completed successfully, or timed out,
         // anything else means we didn't get complete data.
@@ -1724,7 +1736,7 @@ private:
 
         _connected = false;
         if (_response)
-            _response->finish();
+            _response->error();
 
         _fd = -1; // No longer our socket fd.
     }

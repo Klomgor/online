@@ -392,8 +392,6 @@ public:
         return false;
     }
 
-    // poll is idle, are we ?
-    void checkIdle();
     void drainQueue();
     void drainCallbacks();
 
@@ -447,6 +445,8 @@ public:
     /// all operations must complete by the time we
     /// return to the poll
     ThreadPool& getSyncPool() { return _deltaPool; }
+
+    int getViewsCount() const;
 
 private:
     void postForceModifiedCommand(bool modified);

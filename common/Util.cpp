@@ -21,7 +21,6 @@
 
 #if !MOBILEAPP
 #include "SigHandlerTrap.hpp"
-#include <dlfcn.h>
 #endif
 
 #if !defined(__ANDROID__) && !defined(__EMSCRIPTEN__)
@@ -50,6 +49,9 @@
 
 #if defined __GLIBC__
 #include <malloc.h>
+#if defined(M_TRIM_THRESHOLD)
+#include <dlfcn.h>
+#endif
 #endif
 
 #include <atomic>
@@ -993,6 +995,15 @@ namespace Util
         {
             _x1 = _y1 = _x2 = _y2 = 0;
         }
+    }
+
+    std::string base64Encode(std::string_view input)
+    {
+        std::ostringstream oss;
+        Poco::Base64Encoder encoder(oss);
+        encoder << input;
+        encoder.close();
+        return oss.str();
     }
 
 } // namespace Util

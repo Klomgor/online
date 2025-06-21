@@ -495,10 +495,10 @@ class CanvasSectionContainer {
 	public isDocumentObjectVisible (section: CanvasSectionObject): boolean {
 		return app.isRectangleVisibleInTheDisplayedArea(
 			[
-				section.position[0] * app.pixelsToTwips,
-				section.position[1] * app.pixelsToTwips,
-				section.size[0] * app.pixelsToTwips,
-				section.size[1] * app.pixelsToTwips
+				Math.round(section.position[0] * app.pixelsToTwips),
+				Math.round(section.position[1] * app.pixelsToTwips),
+				Math.round(section.size[0] * app.pixelsToTwips),
+				Math.round(section.size[1] * app.pixelsToTwips)
 			]
 		);
 	}
@@ -1194,6 +1194,8 @@ class CanvasSectionContainer {
 		var section: CanvasSectionObject = this.findSectionContainingPoint(point);
 		if (section)
 			this.propagateOnMouseWheel(section, this.convertPositionToSectionLocale(section, point), delta, e);
+
+		app.idleHandler.notifyActive();
 	}
 
 	onMouseLeave (e: MouseEvent) {
@@ -1277,6 +1279,8 @@ class CanvasSectionContainer {
 				this.propagateOnMultiTouchMove(section, this.convertPositionToSectionLocale(section, this.touchCenter), distance, e);
 			}
 		}
+
+		app.idleHandler.notifyActive();
 	}
 
 	onTouchEnd (e: TouchEvent) { // Should be ignored unless this.draggingSomething = true.
@@ -2038,7 +2042,7 @@ class CanvasSectionContainer {
 
 	private animate (timeStamp: number) {
 		if (this.lastFrameStamp > 0)
-			this.elapsedTime += timeStamp - this.lastFrameStamp;
+			this.elapsedTime += Math.max(0, timeStamp - this.lastFrameStamp);
 
 		this.lastFrameStamp = timeStamp;
 
@@ -2113,7 +2117,7 @@ class CanvasSectionContainer {
 			if (options.defer)
 				requestAnimationFrame(this.animate.bind(this));
 			else
-				this.animate(performance.now());
+				this.animate(document.timeline.currentTime as number);
 			return true;
 		}
 		else {
