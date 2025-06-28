@@ -40,6 +40,8 @@
 
 #include <StringVector.hpp>
 
+#include <config.h>
+
 #define STRINGIFY(X) #X
 
 #if CODE_COVERAGE
@@ -1345,6 +1347,8 @@ int main(int argc, char**argv)
     // Wrap localtime_r() and gmtime_t() which are not portable
     std::tm *time_t_to_localtime(std::time_t t, std::tm& tm);
     std::tm *time_t_to_gmtime(std::time_t t, std::tm& tm);
+
+    std::string base64Encode(std::string_view input);
 
 } // end namespace Util
 

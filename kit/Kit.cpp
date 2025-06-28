@@ -151,10 +151,6 @@ int getCurrentThreadCount()
 
 _LibreOfficeKit* loKitPtr = nullptr;
 
-/// Used for test code to accelerating waiting until idle and to
-/// flush sockets with a 'processtoidle' -> 'idle' reply.
-static std::chrono::steady_clock::time_point ProcessToIdleDeadline;
-
 static bool EnableWebsocketURP = false;
 static int URPStartCount = 0;
 
@@ -292,7 +288,7 @@ namespace
     }
 
 #if !defined(BUILDING_TESTS) && !MOBILEAPP
-    enum class LinkOrCopyType
+    enum class LinkOrCopyType: std::uint8_t
     {
         All,
         LO
@@ -509,8 +505,8 @@ namespace
             }
         }
 
-        assert(fpath[strlen(sourceForLinkOrCopy.c_str())] == '/');
-        const char *relativeOldPath = fpath + strlen(sourceForLinkOrCopy.c_str()) + 1;
+        assert(fpath[sourceForLinkOrCopy.size()] == '/');
+        const char* relativeOldPath = fpath + sourceForLinkOrCopy.size() + 1;
         const Poco::Path newPath(destinationForLinkOrCopy, Poco::Path(relativeOldPath));
 
         switch (typeflag)
@@ -648,8 +644,8 @@ namespace
         }
 
         assert(path.size() >= sourceForGCDAFiles.size());
-        assert(fpath[strlen(sourceForGCDAFiles.c_str())] == '/');
-        const char* relativeOldPath = fpath + strlen(sourceForGCDAFiles.c_str()) + 1;
+        assert(fpath[sourceForGCDAFiles.size()] == '/');
+        const char* relativeOldPath = fpath + sourceForGCDAFiles.size() + 1;
         const Poco::Path newPath(destForGCDAFiles, Poco::Path(relativeOldPath));
 
         switch (typeflag)
@@ -2212,6 +2208,11 @@ std::shared_ptr<lok::Document> Document::load(const std::shared_ptr<ChildSession
     return _loKitDocument;
 }
 
+int Document::getViewsCount() const
+{
+    return _loKitDocument ? _loKitDocument->getViewsCount() : 0;
+}
+
 bool Document::forwardToChild(const std::string_view prefix, const std::vector<char>& payload)
 {
     assert(Util::isFuzzing() || payload.size() > prefix.size());
@@ -2425,23 +2426,6 @@ std::vector<TilePrioritizer::ViewIdInactivity> Document::getViewIdsByInactivity(
     return viewIds;
 }
 
-// poll is idle, are we ?
-void Document::checkIdle()
-{
-    // FIXME: can have Idle CallbackFlushHandler work in the core.
-
-    if (!processInputEnabled() || hasQueueItems())
-    {
-        LOG_TRC("Nearly idle - but have more queued items to process");
-        return; // more to do
-    }
-
-    sendTextFrame("idle");
-
-    // get rid of idle check for now.
-    ProcessToIdleDeadline = std::chrono::steady_clock::now() - std::chrono::milliseconds(10);
-}
-
 bool Document::processInputEnabled() const
 {
     bool enabled = !_websocketHandler || _websocketHandler->processInputEnabled();
@@ -2556,13 +2540,6 @@ void Document::drainQueue()
             else if (tokens.startsWith(0, "child-"))
             {
                 forwardToChild(tokens[0], input);
-            }
-            else if (tokens.equals(0, "processtoidle"))
-            {
-                ProcessToIdleDeadline = std::chrono::steady_clock::now();
-                uint32_t timeoutUs = 0;
-                if (tokens.getUInt32(1, "timeout", timeoutUs))
-                    ProcessToIdleDeadline += std::chrono::microseconds(timeoutUs);
             }
             else if (tokens.equals(0, "callback"))
             {
@@ -3023,9 +3000,6 @@ int KitSocketPoll::kitPoll(int timeoutMicroS)
 
     auto startTime = std::chrono::steady_clock::now();
 
-    // handle processtoidle waiting optimization
-    bool checkForIdle = ProcessToIdleDeadline >= startTime;
-
     if (timeoutMicroS < 0)
     {
         // Flush at most 1 + maxExtraEvents, or return when nothing left.
@@ -3034,9 +3008,6 @@ int KitSocketPoll::kitPoll(int timeoutMicroS)
     }
     else
     {
-        if (checkForIdle)
-            timeoutMicroS = 0;
-
         // Flush at most maxEvents+1, or return when nothing left.
         _pollEnd = startTime + std::chrono::microseconds(timeoutMicroS);
         do
@@ -3055,21 +3026,6 @@ int KitSocketPoll::kitPoll(int timeoutMicroS)
                 std::chrono::duration_cast<std::chrono::microseconds>(_pollEnd - now).count();
             ++eventsSignalled;
         } while (timeoutMicroS > 0 && !SigUtil::getTerminationFlag() && maxExtraEvents-- > 0);
-    }
-
-    if (_document && checkForIdle && eventsSignalled == 0 && timeoutMicroS > 0 &&
-        !hasCallbacks() && !hasBuffered())
-    {
-        auto remainingTime = ProcessToIdleDeadline - startTime;
-        LOG_TRC(
-            "Poll of "
-            << timeoutMicroS << " vs. remaining time of: "
-            << std::chrono::duration_cast<std::chrono::microseconds>(remainingTime).count());
-        // would we poll until then if we could ?
-        if (remainingTime < std::chrono::microseconds(timeoutMicroS))
-            _document->checkIdle();
-        else
-            LOG_TRC("Poll of would not close gap - continuing");
     }
 
     drainQueue();
@@ -3611,8 +3567,9 @@ void lokit_main(
 
                 linkOrCopy(loTemplate, loJailDestPath, linkablePath, LinkOrCopyType::LO);
 
-                linkOrCopy(sharedTemplate, loJailDestImpressTemplatePath + "/", linkablePath,
-                           LinkOrCopyType::All);
+                if (!configId.empty())
+                    linkOrCopy(sharedTemplate, loJailDestImpressTemplatePath + "/", linkablePath,
+                               LinkOrCopyType::All);
 
 #if CODE_COVERAGE
                 // Link the .gcda files.
@@ -4186,7 +4143,6 @@ bool globalPreinit(const std::string &loTemplate)
 
     // Disable problematic components that may be present from a
     // desktop or developer's install if env. var not set.
-    ::setenv("DISABLE_SYSTEM_DEPENDENT_PRIMITIVE_RENDERER", "1", 1);
     ::setenv("UNODISABLELIBRARY",
              "abp avmediagst avmediavlc cmdmail losessioninstall OGLTrans PresenterScreen "
              "syssh ucpftp1 ucpgio1 ucpimage updatecheckui updatefeed updchk"

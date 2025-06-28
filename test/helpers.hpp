@@ -610,7 +610,8 @@ connectLOKit(const std::shared_ptr<SocketPoll>& socketPoll, const Poco::URI& uri
             http::Request req(url);
             ws->asyncRequest(req, socketPoll);
 
-            TST_LOG("Connected to " << uri.toString() << ", waiting for progress: id:find response");
+            TST_LOG("Requested " << url << " from " << uri.toString()
+                                 << ", waiting for progress: id:find response");
             std::string msg;
             if (!(msg = getResponseString(ws, "progress:", testname)).empty() &&
                 COOLProtocol::matchPrefix("progress:", msg) &&
@@ -747,7 +748,7 @@ inline std::vector<char> getTileMessage(const std::shared_ptr<http::WebSocketSes
     return getResponseMessage(ws, "tile", testname);
 }
 
-enum SpecialKey { skNone=0, skShift=0x1000, skCtrl=0x2000, skAlt=0x4000 };
+enum SpecialKey : std::uint16_t { skNone=0, skShift=0x1000, skCtrl=0x2000, skAlt=0x4000 };
 
 inline int getCharChar(char ch, SpecialKey specialKeys)
 {

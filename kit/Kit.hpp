@@ -122,7 +122,7 @@ private:
 /// We have two types of password protected documents
 /// 1) Documents which require password to view
 /// 2) Document which require password to modify
-enum class DocumentPasswordType
+enum class DocumentPasswordType : std::uint8_t
 {
     ToView,
     ToModify
@@ -392,8 +392,6 @@ public:
         return false;
     }
 
-    // poll is idle, are we ?
-    void checkIdle();
     void drainQueue();
     void drainCallbacks();
 
@@ -447,6 +445,8 @@ public:
     /// all operations must complete by the time we
     /// return to the poll
     ThreadPool& getSyncPool() { return _deltaPool; }
+
+    int getViewsCount() const;
 
 private:
     void postForceModifiedCommand(bool modified);

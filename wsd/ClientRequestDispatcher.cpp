@@ -522,8 +522,8 @@ public:
             return toState();
         };
 
-        const std::string& addressToCheck = _addressesToResolve.front();
-        net::AsyncDNS::lookup(addressToCheck, pushHostnameResolvedToPoll, dumpState);
+        net::AsyncDNS::lookup(_addressesToResolve.front(), std::move(pushHostnameResolvedToPoll),
+                              dumpState);
     }
 
     void hostnameResolved(const net::HostEntry& hostEntry)
@@ -643,13 +643,17 @@ bool ClientRequestDispatcher::allowConvertTo(const std::string& address,
 
 #endif // !MOBILEAPP
 
+std::atomic<uint64_t> ClientRequestDispatcher::NextConnectionId(1);
+
 void ClientRequestDispatcher::onConnect(const std::shared_ptr<StreamSocket>& socket)
 {
-    _id = COOLWSD::GetConnectionId();
+    assert(socket && "Expected a valid socket in ClientRequestDispatcher::onConnect()");
+    _id = Util::encodeId(NextConnectionId++, 3);
     _socket = socket;
     _lastSeenHTTPHeader = socket->getLastSeenTime();
     setLogContext(socket->getFD());
-    LOG_TRC("Connected to ClientRequestDispatcher");
+    LOG_TRC("Connected #" << socket->getFD() << " (connection " << _id
+                          << ") to ClientRequestDispatcher " << this);
 }
 
 /// Starts an asynchronous CheckFileInfo request in parallel to serving
@@ -935,7 +939,10 @@ void ClientRequestDispatcher::handleIncomingMessage(SocketDisposition& dispositi
             else if (requestDetails.equals(1, "capabilities"))
                 servedSync = handleCapabilitiesRequest(request, socket);
             else if (requestDetails.equals(1, "wopiAccessCheck"))
-                handleWopiAccessCheckRequest(request, message, socket);
+            {
+                const std::string text(std::istreambuf_iterator<char>(message), {});
+                handleWopiAccessCheckRequest(request, text, socket);
+            }
             else
                 HttpHelper::sendErrorAndShutdown(http::StatusCode::BadRequest, socket);
         }
@@ -1196,15 +1203,14 @@ void ClientRequestDispatcher::sendResult(const std::shared_ptr<StreamSocket>& so
     LOG_INF("Wopi Access Check request, result: " << nameShort(result));
 }
 
-bool ClientRequestDispatcher::handleWopiAccessCheckRequest(const Poco::Net::HTTPRequest& request,
-                                                           std::istream& message,
-                                                           const std::shared_ptr<StreamSocket>& socket)
+bool ClientRequestDispatcher::handleWopiAccessCheckRequest(
+    const Poco::Net::HTTPRequest& request, const std::string& text,
+    const std::shared_ptr<StreamSocket>& socket)
 {
     assert(socket && "Must have a valid socket");
 
     LOG_DBG("Wopi Access Check request: " << request.getURI());
 
-    std::string text(std::istreambuf_iterator<char>(message), {});
     LOG_TRC("Wopi Access Check request text: " << text);
 
     std::string callbackUrlStr;
@@ -1936,7 +1942,8 @@ bool ClientRequestDispatcher::handlePostRequest(const RequestDetails& requestDet
                 // we want it enabled (i.e. we shouldn't set the option if we don't want it).
                 options = ",FullSheetPreview=trueFULLSHEETPREVEND";
             }
-            const std::string pdfVer = (form.has("PDFVer") ? form.get("PDFVer") : "");
+
+            const std::string pdfVer = (form.has("PDFVer") ? form.get("PDFVer") : std::string());
             if (!pdfVer.empty())
             {
                 if (strcasecmp(pdfVer.c_str(), "PDF/A-1b") &&
@@ -1959,9 +1966,9 @@ bool ClientRequestDispatcher::handlePostRequest(const RequestDetails& requestDet
                 options += ",infilterOptions=" + form.get("infilterOptions");
             }
 
-            std::string lang = (form.has("lang") ? form.get("lang") : std::string());
-            std::string target = (form.has("target") ? form.get("target") : std::string());
-            std::string filter = (form.has("filter") ? form.get("filter") : std::string());
+            const std::string lang = (form.has("lang") ? form.get("lang") : std::string());
+            const std::string target = (form.has("target") ? form.get("target") : std::string());
+            const std::string filter = (form.has("filter") ? form.get("filter") : std::string());
 
             std::string encodedTransformJSON;
             if (form.has("transform"))
@@ -2370,8 +2377,7 @@ const std::string& ClientRequestDispatcher::getFileContent(const std::string& fi
     const auto it = StaticFileContentCache.find(filename);
     if (it == StaticFileContentCache.end())
     {
-        throw Poco::FileAccessDeniedException("Invalid or forbidden file path: [" + filename +
-                                              "].");
+        throw Poco::FileAccessDeniedException("Invalid or forbidden file path: [" + filename + ']');
     }
 
     return it->second;

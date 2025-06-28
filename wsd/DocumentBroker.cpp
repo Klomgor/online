@@ -499,6 +499,13 @@ void DocumentBroker::pollThread()
                 }
 #endif
 
+                if (_uploadRequest && _uploadRequest->isComplete())
+                {
+                    // We are done. Safe to reset.
+                    LOG_TRC("Resetting uploadRequest instance");
+                    _uploadRequest.reset();
+                }
+
                 // Check if there are queued activities.
                 if (!_renameFilename.empty() && !_renameSessionId.empty())
                 {
@@ -1135,18 +1142,31 @@ bool DocumentBroker::download(
     }
     else
     {
-        // Check if document has been modified by some external action
+        // Check if document has been modified by some external action,
+        // but only if *we* aren't uploading. Otherwise, it might be us.
         LOG_TRC("Document modified time: " << fileInfo.getLastModifiedTime());
         if (!_storageManager.getLastModifiedTime().empty() &&
             !fileInfo.getLastModifiedTime().empty() &&
             _storageManager.getLastModifiedTime() != fileInfo.getLastModifiedTime())
         {
-            LOG_DBG("Document [" << _docKey << "] has been modified behind our back. "
-                                 << "Informing all clients. Expected: "
-                                 << _storageManager.getLastModifiedTime()
-                                 << ", Actual: " << fileInfo.getLastModifiedTime());
+            if (_uploadRequest)
+            {
+                LOG_DBG("Document ["
+                        << _docKey
+                        << "] timestamp checked for a match during an up-load, results may race, "
+                           "so ignoring inconsistent timestamp. Expected: "
+                        << _storageManager.getLastModifiedTime()
+                        << ", Actual: " << fileInfo.getLastModifiedTime());
+            }
+            else
+            {
+                LOG_WRN("Document [" << _docKey << "] has been modified behind our back. "
+                                     << "Informing all clients. Expected: "
+                                     << _storageManager.getLastModifiedTime()
+                                     << ", Actual: " << fileInfo.getLastModifiedTime());
 
-            handleDocumentConflict();
+                handleDocumentConflict();
+            }
         }
     }
 
@@ -1298,21 +1318,23 @@ bool DocumentBroker::doDownloadDocument(const Authorization& auth,
     if (!templateSource.empty())
     {
         // Invalid timestamp for templates, to force uploading once we save-after-loading.
-        _saveManager.setLastModifiedTime(std::chrono::system_clock::time_point());
-        _storageManager.setLastUploadedFileModifiedTime(std::chrono::system_clock::time_point());
+        _saveManager.setLastModifiedLocalTime(std::chrono::system_clock::time_point());
+        _storageManager.setLastUploadedFileModifiedLocalTime(
+            std::chrono::system_clock::time_point());
     }
     else
     {
         // Use the local temp file's timestamp.
         const auto timepoint = FileUtil::Stat(localFilePath).modifiedTimepoint();
-        _saveManager.setLastModifiedTime(timepoint);
-        _storageManager.setLastUploadedFileModifiedTime(timepoint); // Used to detect modifications.
+        _saveManager.setLastModifiedLocalTime(timepoint);
+        _storageManager.setLastUploadedFileModifiedLocalTime(
+            timepoint); // Used to detect modifications.
     }
 
     const bool dontUseCache = Util::isMobileApp();
 
     _tileCache = std::make_unique<TileCache>(_storage->getUri().toString(),
-                                             _saveManager.getLastModifiedTime(), dontUseCache);
+                                             _saveManager.getLastModifiedLocalTime(), dontUseCache);
     _tileCache->setThreadOwner(std::this_thread::get_id());
 
     return true;
@@ -2357,7 +2379,7 @@ bool DocumentBroker::isStorageOutdated() const
 
     const std::chrono::system_clock::time_point currentModifiedTime = st.modifiedTimepoint();
     const std::chrono::system_clock::time_point lastModifiedTime =
-        _storageManager.getLastUploadedFileModifiedTime();
+        _storageManager.getLastUploadedFileModifiedLocalTime();
 
     LOG_TRC("File to upload to storage ["
             << _storage->getRootFilePathUploading() << "] was modified at " << currentModifiedTime
@@ -2365,13 +2387,14 @@ bool DocumentBroker::isStorageOutdated() const
             << (currentModifiedTime == lastModifiedTime ? "identical" : "different"));
 
 #if ENABLE_DEBUG
-    if (_storageManager.getLastUploadedFileModifiedTime() != _saveManager.getLastModifiedTime())
+    if (_storageManager.getLastUploadedFileModifiedLocalTime() !=
+        _saveManager.getLastModifiedLocalTime())
     {
         const std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
         LOG_ERR("StorageManager's lastModifiedTime ["
-                << Util::getTimeForLog(now, _storageManager.getLastUploadedFileModifiedTime())
+                << Util::getTimeForLog(now, _storageManager.getLastUploadedFileModifiedLocalTime())
                 << "] doesn't match that of SaveManager's ["
-                << Util::getTimeForLog(now, _saveManager.getLastModifiedTime())
+                << Util::getTimeForLog(now, _saveManager.getLastModifiedLocalTime())
                 << "]. File lastModifiedTime: [" << Util::getTimeForLog(now, currentModifiedTime)
                 << ']');
     }
@@ -2692,8 +2715,8 @@ void DocumentBroker::uploadToStorageInternal(const std::shared_ptr<ClientSession
     // If the file timestamp hasn't changed, skip uploading.
     const std::chrono::system_clock::time_point newFileModifiedTime
         = FileUtil::Stat(_storage->getRootFilePathUploading()).modifiedTimepoint();
-    if (!isSaveAs && newFileModifiedTime == _saveManager.getLastModifiedTime() && !isRename
-        && !force)
+    if (!isSaveAs && newFileModifiedTime == _saveManager.getLastModifiedLocalTime() && !isRename &&
+        !force)
     {
         // We can end up here when an earlier upload attempt had failed because
         // of a connection failure. In that case, _storageManger.lastUploadSuccessful()
@@ -2708,9 +2731,9 @@ void DocumentBroker::uploadToStorageInternal(const std::shared_ptr<ClientSession
                    "lastModifiedTime ["
                 << Util::getTimeForLog(now, newFileModifiedTime)
                 << "] is identical to the SaveManager's ["
-                << Util::getTimeForLog(now, _saveManager.getLastModifiedTime())
+                << Util::getTimeForLog(now, _saveManager.getLastModifiedLocalTime())
                 << "]. StorageManager's lastModifiedTime ["
-                << Util::getTimeForLog(now, _storageManager.getLastUploadedFileModifiedTime())
+                << Util::getTimeForLog(now, _storageManager.getLastUploadedFileModifiedLocalTime())
                 << ']');
     }
 
@@ -2722,6 +2745,8 @@ void DocumentBroker::uploadToStorageInternal(const std::shared_ptr<ClientSession
     StorageBase::AsyncUploadCallback asyncUploadCallback =
         [this](const StorageBase::AsyncUpload& asyncUp)
     {
+        assert(_uploadRequest && "Expected to have a valid UploadRequest instance");
+
         switch (asyncUp.state())
         {
             case StorageBase::AsyncUpload::State::Running:
@@ -2734,12 +2759,13 @@ void DocumentBroker::uploadToStorageInternal(const std::shared_ptr<ClientSession
                 LOG_TRC("Finished uploading [" << _docKey << "] during "
                                                << DocumentState::name(_docState.activity())
                                                << ", processing results.");
+                _uploadRequest->setComplete();
                 return handleUploadToStorageResponse(asyncUp.result());
             }
 
             case StorageBase::AsyncUpload::State::None: // Unexpected: fallback.
             case StorageBase::AsyncUpload::State::Error:
-            default:
+                _uploadRequest->setComplete();
                 broadcastSaveResult(false, "Could not upload document to storage");
                 // [[fallthrough]]
         }
@@ -2750,9 +2776,6 @@ void DocumentBroker::uploadToStorageInternal(const std::shared_ptr<ClientSession
 
         switch (_docState.activity())
         {
-            case DocumentState::Activity::None:
-                break;
-
             case DocumentState::Activity::Rename:
             {
                 LOG_DBG("Failed to renameFile because uploading post-save failed.");
@@ -2805,6 +2828,7 @@ void DocumentBroker::uploadToStorageInternal(const std::shared_ptr<ClientSession
 
 void DocumentBroker::handleUploadToStorageSuccessful(const StorageBase::UploadResult& uploadResult)
 {
+    assert(_uploadRequest && "Expected to have a valid UploadRequest instance");
     LOG_DBG("Last upload result: OK");
 
 #if !MOBILEAPP
@@ -2816,13 +2840,13 @@ void DocumentBroker::handleUploadToStorageSuccessful(const StorageBase::UploadRe
     if (!_uploadRequest->isSaveAs() && !_uploadRequest->isRename())
     {
         // Saved and stored; update flags.
-        _saveManager.setLastModifiedTime(_uploadRequest->newFileModifiedTime());
+        _saveManager.setLastModifiedLocalTime(_uploadRequest->newFileModifiedTime());
 
         // Save the storage timestamp.
         _storageManager.setLastModifiedTime(_storage->getLastModifiedTime());
 
         // Set the timestamp of the file we uploaded, to detect changes.
-        _storageManager.setLastUploadedFileModifiedTime(_uploadRequest->newFileModifiedTime());
+        _storageManager.setLastUploadedFileModifiedLocalTime(_uploadRequest->newFileModifiedTime());
 
         // After a successful save, we are sure that document in the storage is same as ours
         _documentChangedInStorage = false;
@@ -2976,12 +3000,7 @@ void DocumentBroker::handleUploadToStorageSuccessful(const StorageBase::UploadRe
 
 void DocumentBroker::handleUploadToStorageResponse(const StorageBase::UploadResult& uploadResult)
 {
-    if (!_uploadRequest)
-    {
-        // We shouldn't get here if there is no active upload request.
-        LOG_ERR("No active upload request while handling upload result.");
-        return;
-    }
+    assert(_uploadRequest && "Expected to have a valid UploadRequest instance");
 
     // Storage upload is considered successful only when storage returns OK.
     const bool lastUploadSuccessful =
@@ -3018,6 +3037,7 @@ void DocumentBroker::handleUploadToStorageFailed(const StorageBase::UploadResult
 {
     assert(uploadResult.getResult() != StorageBase::UploadResult::Result::OK &&
            "Expected upload failure");
+    assert(_uploadRequest && "Expected to have a valid UploadRequest instance");
 
     if (_docState.activity() == DocumentState::Activity::Rename)
     {
@@ -3621,7 +3641,7 @@ bool DocumentBroker::sendUnoSave(const std::shared_ptr<ClientSession>& session,
     LOG_INF("Saving doc [" << _docKey << "] using session [" << sessionId << ']');
 
     // Invalidate the timestamp to force persisting.
-    _saveManager.setLastModifiedTime(std::chrono::system_clock::time_point());
+    _saveManager.setLastModifiedLocalTime(std::chrono::system_clock::time_point());
 
     static const bool forceBackgroundEnv = !!getenv("COOL_FORCE_BGSAVE");
     constexpr std::size_t MaxFailureCountForBackgroundSaving = 2; // Give only 1 extra chance.

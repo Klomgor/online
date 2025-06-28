@@ -81,8 +81,8 @@ private:
                                    const std::shared_ptr<StreamSocket>& socket);
 
     bool handleWopiAccessCheckRequest(const Poco::Net::HTTPRequest& request,
-                                   std::istream& message,
-                                   const std::shared_ptr<StreamSocket>& socket);
+                                      const std::string& text,
+                                      const std::shared_ptr<StreamSocket>& socket);
 
     /// @return true if request has been handled synchronously and response sent, otherwise false
     static bool handleClipboardRequest(const Poco::Net::HTTPRequest& request,
@@ -177,6 +177,9 @@ private:
 
     /// Cache for static files, to avoid reading and processing from disk.
     static std::map<std::string, std::string> StaticFileContentCache;
+
+    /// The next unique connection-ID.
+    static std::atomic<uint64_t> NextConnectionId;
 };
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */

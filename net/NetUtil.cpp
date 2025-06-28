@@ -197,10 +197,7 @@ HostEntry syncResolveDNS(const std::string& addressToCheck)
     std::shared_ptr<HostEntry> result;
 
     net::AsyncDNS::DNSThreadDumpStateFn dumpState = [addressToCheck]() -> std::string
-    {
-        std::string state = "syncResolveDNS: [" + addressToCheck + "]";
-        return state;
-    };
+    { return "syncResolveDNS: [" + addressToCheck + ']'; };
 
     net::AsyncDNS::DNSThreadFn callback = [&mutex, &result, &cv](const HostEntry& hostEntry)
     {
@@ -212,7 +209,7 @@ HostEntry syncResolveDNS(const std::string& addressToCheck)
 
     std::unique_lock<std::mutex> lock(mutex);
 
-    AsyncDNS::lookup(addressToCheck, callback, dumpState);
+    AsyncDNS::lookup(addressToCheck, std::move(callback), dumpState);
 
     cv.wait(lock, [&result]{ return static_cast<bool>(result); });
 
@@ -402,12 +399,10 @@ void AsyncDNS::resolveDNS()
     }
 }
 
-void AsyncDNS::addLookup(const std::string& lookup,
-                         const DNSThreadFn& cb,
-                         const DNSThreadDumpStateFn& dumpState)
+void AsyncDNS::addLookup(std::string lookup, DNSThreadFn cb, const DNSThreadDumpStateFn& dumpState)
 {
     std::unique_lock<std::mutex> guard(_lock);
-    _lookups.emplace(Lookup({lookup, cb, dumpState}));
+    _lookups.emplace(std::move(lookup), std::move(cb), dumpState);
     guard.unlock();
     _condition.notify_one();
 }
@@ -441,11 +436,10 @@ void AsyncDNS::stopAsyncDNS()
 }
 
 //static
-void AsyncDNS::lookup(const std::string& searchEntry,
-                      const DNSThreadFn& cb,
+void AsyncDNS::lookup(std::string searchEntry, DNSThreadFn cb,
                       const DNSThreadDumpStateFn& dumpState)
 {
-    AsyncDNSThread->addLookup(searchEntry, cb, dumpState);
+    AsyncDNSThread->addLookup(std::move(searchEntry), std::move(cb), dumpState);
 }
 
 void
@@ -546,7 +540,7 @@ asyncConnect(const std::string& host, const std::string& port, const bool isSSL,
         return state;
     };
 
-    AsyncDNS::lookup(host, callback, dumpState);
+    AsyncDNS::lookup(host, std::move(callback), dumpState);
 }
 
 std::shared_ptr<StreamSocket>
