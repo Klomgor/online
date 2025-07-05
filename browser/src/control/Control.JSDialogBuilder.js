@@ -62,7 +62,11 @@ L.Control.JSDialogBuilder = L.Control.extend({
 	_currentDepth: 0,
 
 	rendersCache: {
-		fontnamecombobox: { persistent: true, images: [] }
+		fontnamecombobox: { persistent: true, images: [] },
+		layoutpanel_icons: { persistent: true, images: [] },
+		transitions_icons: { persistent: true, images: [] },
+		iconview_theme_colors: { persistent: true, images: [] },
+		ctlFavoriteswin: { persistent: true, images: [] },
 	}, // eg. custom renders for combobox entries
 
 	setWindowId: function (id) {
@@ -429,7 +433,7 @@ L.Control.JSDialogBuilder = L.Control.extend({
 	},
 
 	_stressAccessKey: function(element, accessKey) {
-		if (!accessKey || window.mode.isMobile())
+		if (!accessKey || window.mode.isMobile() || window.getAccessibilityState())
 			return;
 
 		var text = element.textContent;
@@ -1013,7 +1017,7 @@ L.Control.JSDialogBuilder = L.Control.extend({
 					$(tab).addClass('selected');
 					tab.setAttribute('aria-selected', 'true');
 					tab.tabIndex = '0';
-					tab.title = tabTooltip;
+					tab.setAttribute('data-cooltip', tabTooltip);
 					singleTabId = tabIdx;
 				} else {
 					tab.setAttribute('aria-selected', 'false');
@@ -1065,7 +1069,7 @@ L.Control.JSDialogBuilder = L.Control.extend({
 					const currentIndex = tabs.indexOf(tab);
 					const diff = backwards ? -1 : 1;
 					const total = tabs.length;
-				
+
 					for (let i = 1; i <= total; i++) {
 						const nextIndex = (currentIndex + diff * i + total) % total;
 						const nextTab = tabs[nextIndex];
@@ -1073,7 +1077,7 @@ L.Control.JSDialogBuilder = L.Control.extend({
 							return nextTab;
 						}
 					}
-				
+
 					// Fallback to current tab if no visible one is found (shouldn't happen)
 					return tab;
 				};
@@ -1249,7 +1253,7 @@ L.Control.JSDialogBuilder = L.Control.extend({
 								let visibleContainer = Array.from(container[0].children).find(child =>
 									!child.classList.contains('hidden') && child.offsetParent !== null
 								);
-								let focusables = visibleContainer ? Array.from(visibleContainer.querySelectorAll('[tabindex="-1"]:not([disabled])')) : [];								
+								let focusables = visibleContainer ? Array.from(visibleContainer.querySelectorAll('[tabindex="-1"]:not([disabled])')) : [];
 								if (focusables.length) {
 									let first = focusables[0];
 									let last = focusables[focusables.length - 1];
@@ -2067,6 +2071,15 @@ L.Control.JSDialogBuilder = L.Control.extend({
 		if (data.class)
 			div.classList.add(data.class);
 
+		const hasDropdownArrow = !!(options && options.hasDropdownArrow);
+		const isSplitButton = !!data.applyCallback;
+		const isDropdownButton = !!data.dropdown;
+
+		/**
+		 * Determines if the dropdown arrow should be interactive (focusable button) vs decorative (div).
+		 * This affects ARIA attribute placement and arrowbackground element type creation.
+		 */
+		const isArrowInteractive = (hasDropdownArrow && isSplitButton) || isDropdownButton;
 		var isRealUnoCommand = true;
 		var hasPopUp = false;
 		var hasImage = true;
@@ -2114,7 +2127,8 @@ L.Control.JSDialogBuilder = L.Control.extend({
 			else
 				button.accessKey = data.accessKey;
 
-			if (hasPopUp)
+			// if dropdown arrow does not exist or is not interactive then only button can have aria-haspopup
+			if (hasPopUp && !isArrowInteractive)
 				button.setAttribute('aria-haspopup', true);
 
 			if (data.w2icon) {
@@ -2140,7 +2154,9 @@ L.Control.JSDialogBuilder = L.Control.extend({
 
 			controls['button'] = button;
 			var span;
-			if (builder.options.noLabelsForUnoButtons !== true && data.text) {
+			if (data.noLabel)
+				$(div).addClass('no-label');
+			else if (builder.options.noLabelsForUnoButtons !== true && data.text) {
 				span = L.DomUtil.create('span', 'ui-content unolabel', button);
 				span.textContent = builder._cleanText(data.text);
 				builder._stressAccessKey(span, button.accessKey);
@@ -2240,51 +2256,61 @@ L.Control.JSDialogBuilder = L.Control.extend({
 			controls['label'] = span;
 		}
 
-		if (options && options.hasDropdownArrow) {
+		if (hasDropdownArrow || isDropdownButton) {
 			$(div).addClass('has-dropdown');
-			if (data.applyCallback) {
+			div.setAttribute('role', 'group');
+			var arrowbackground;
+			// isArrowInteractive is true for split buttons or dropdown buttons
+			if (isArrowInteractive) {
 				// Arrow should be a real button (user can interact with it)
-				var arrowbackground = L.DomUtil.create('button', 'arrowbackground', div);
+				arrowbackground = L.DomUtil.create('button', 'arrowbackground', div);
 			} else {
 				// Arrow is just decoration
-				var arrowbackground = L.DomUtil.create('div', 'arrowbackground', div);
+				arrowbackground = L.DomUtil.create('div', 'arrowbackground', div);
 				arrowbackground.setAttribute('aria-hidden', 'true');
-			}			
-			L.DomUtil.create('i', 'unoarrow', arrowbackground);
-			controls['arrow'] = arrowbackground;
-		} else if (data.dropdown === true) {
-			$(div).addClass('has-dropdown');
-			var arrowbackground = L.DomUtil.create('button', 'arrowbackground', div);
+			}
 			L.DomUtil.create('i', 'unoarrow', arrowbackground);
 			controls['arrow'] = arrowbackground;
 
-			// Attach event listeners for both 'click' and 'keydown'
-			arrowbackground.addEventListener('click', function (event) {
-				openToolBoxMenu(event, div);
-			});
-			arrowbackground.addEventListener('keydown', function (event) {
-				switch (event.key) {
-					case 'Enter':
-						openToolBoxMenu(event, div);
-						break;
-				}
-			});
+			if (!hasDropdownArrow && isDropdownButton) {
+				// Attach both 'click' and 'keydown' event listeners for dropdown buttons only
+				arrowbackground.addEventListener('click', function (event) {
+					openToolBoxMenu(event);
+				});
+				arrowbackground.addEventListener('keydown', function (event) {
+					switch (event.key) {
+						case 'Enter':
+							openToolBoxMenu(event);
+							break;
+					}
+				});
 
-			div.closeDropdown = function() {
-				div.setAttribute('aria-expanded', false);
-				builder.callback('toolbox', 'closemenu', parentContainer, data.command, builder);
-			};
+				div.closeDropdown = function() {
+					arrowbackground.setAttribute('aria-expanded', false);
+					builder.callback('toolbox', 'closemenu', parentContainer, data.command, builder);
+				};
+			}
 		}
 
 		if (arrowbackground) {
-			div.setAttribute('aria-expanded', false);
-			// if main button element in split button works same as arrowbackground then make sure arrowbackground not focusable due to a11y conflicts 
-			data.applyCallback ? arrowbackground.tabIndex = '0' : arrowbackground.tabIndex = '-1';
+			// if main button element in split button works same as arrowbackground then make sure arrowbackground not focusable due to a11y conflicts
+			isSplitButton ? arrowbackground.tabIndex = '0' : arrowbackground.tabIndex = '-1';
+
+			if (isArrowInteractive)  {
+				const buttonText = data.aria && data.aria.label ? data.aria.label : builder._cleanText(data.text);
+				const dropdownAriaLabelText = _('Open %NAME').replace('%NAME', buttonText);
+				arrowbackground.setAttribute('aria-label', dropdownAriaLabelText);
+				arrowbackground.setAttribute('aria-haspopup', true);
+				arrowbackground.setAttribute('aria-expanded', false);
+			} else {
+				// If the dropdown arrow is not interactive then we want aria-expanded on interactive button
+				button.setAttribute('aria-expanded', false);
+			}
 		}
 
-		var openToolBoxMenu = function(event, div) {
+		var openToolBoxMenu = function(event) {
 			if (!div.hasAttribute('disabled')) {
-				div.setAttribute('aria-expanded', true);
+				arrowbackground.setAttribute('aria-expanded', true);
 				builder.callback('toolbox', 'openmenu', parentContainer, data.command, builder);
 				event.stopPropagation();
 			}
@@ -2299,7 +2325,9 @@ L.Control.JSDialogBuilder = L.Control.extend({
 					builder.callback('toolbutton', 'click', button, data.command, builder);
 				else {
 					builder.callback('toolbox', 'click', parentContainer, data.command, builder);
-					button.setAttribute('aria-expanded', true);
+					// Only set aria-expanded on the button if the arrow is not interactive
+					if (!isArrowInteractive)
+						button.setAttribute('aria-expanded', true);
 				}
 			}
 			e.preventDefault();
@@ -2871,6 +2899,7 @@ L.Control.JSDialogBuilder = L.Control.extend({
 			&& data.type !== 'separator'
 			&& data.type !== 'spacer'
 			&& data.type !== 'edit'
+			&& data.type !== 'deck'
 			)
 			control.setAttribute('tabIndex', '0');
 	},

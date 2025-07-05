@@ -40,6 +40,8 @@
 
 #include <StringVector.hpp>
 
+#include <config.h>
+
 #define STRINGIFY(X) #X
 
 #if CODE_COVERAGE
@@ -58,6 +60,13 @@ extern "C"
 #define THREAD_UNSAFE_DUMP_BEGIN
 #define THREAD_UNSAFE_DUMP_END
 #endif
+
+/// Format minutes with the units suffix until we migrate to C++20.
+inline std::ostream& operator<<(std::ostream& os, const std::chrono::minutes& s)
+{
+    os << s.count() << "m";
+    return os;
+}
 
 /// Format seconds with the units suffix until we migrate to C++20.
 inline std::ostream& operator<<(std::ostream& os, const std::chrono::seconds& s)
@@ -1088,12 +1097,14 @@ int main(int argc, char**argv)
     template <typename U, typename T> std::string getTimeForLog(const U& now, const T& time)
     {
         const auto elapsed = now - convertChronoClock<U>(time);
-        const auto elapsedS = std::chrono::duration_cast<std::chrono::seconds>(elapsed);
+        const auto elapsedM = std::chrono::duration_cast<std::chrono::minutes>(elapsed);
+        const auto elapsedS = std::chrono::duration_cast<std::chrono::seconds>(elapsed) - elapsedM;
         const auto elapsedMS =
             std::chrono::duration_cast<std::chrono::milliseconds>(elapsed) - elapsedS;
 
         std::stringstream ss;
-        ss << getClockAsString(time) << " (" << elapsedS << ' ' << elapsedMS << " ago)";
+        ss << getClockAsString(time) << " (" << elapsedM << ' ' << elapsedS << ' ' << elapsedMS
+           << " ago)";
         return ss.str();
     }
 
@@ -1223,6 +1234,25 @@ int main(int argc, char**argv)
         return iequal(lhs.data(), lhs.size(), rhs.data(), rhs.size());
     }
 
+    /// Compare two containers (of the same type) for equality.
+    template <typename Container> inline bool equal(const Container& c1, const Container& c2)
+    {
+        if (c1.size() == c2.size())
+        {
+            auto it1 = c1.begin();
+            auto it2 = c2.begin();
+            for (; it1 != c1.end() && it2 != c2.end(); ++it1, ++it2)
+            {
+                if (*it1 != *it2)
+                    return false;
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
     /// Convert a vector to a string. Useful for conversion in templates.
     template <typename T> inline std::string toString(const T& x)
     {
@@ -1345,6 +1375,8 @@ int main(int argc, char**argv)
     // Wrap localtime_r() and gmtime_t() which are not portable
     std::tm *time_t_to_localtime(std::time_t t, std::tm& tm);
     std::tm *time_t_to_gmtime(std::time_t t, std::tm& tm);
+
+    std::string base64Encode(std::string_view input);
 
 } // end namespace Util
 

@@ -166,6 +166,7 @@ class CanvasSectionContainer {
 	private context: CanvasRenderingContext2D;
 	private width: number;
 	private height: number;
+	private needsResize: boolean = false;
 	private positionOnMouseDown: Array<number> = null;
 	private positionOnMouseUp: Array<number> = null;
 	private positionOnClick: Array<number> = null;
@@ -283,7 +284,7 @@ class CanvasSectionContainer {
 	}
 
 	public getViewSize (): Array<number> {
-		return [this.canvas.width, this.canvas.height];
+		return [this.width, this.height];
 	}
 
 	public getLastPanDirection() : Array<number> {
@@ -495,10 +496,10 @@ class CanvasSectionContainer {
 	public isDocumentObjectVisible (section: CanvasSectionObject): boolean {
 		return app.isRectangleVisibleInTheDisplayedArea(
 			[
-				section.position[0] * app.pixelsToTwips,
-				section.position[1] * app.pixelsToTwips,
-				section.size[0] * app.pixelsToTwips,
-				section.size[1] * app.pixelsToTwips
+				Math.round(section.position[0] * app.pixelsToTwips),
+				Math.round(section.position[1] * app.pixelsToTwips),
+				Math.round(section.size[0] * app.pixelsToTwips),
+				Math.round(section.size[1] * app.pixelsToTwips)
 			]
 		);
 	}
@@ -642,6 +643,22 @@ class CanvasSectionContainer {
 
 	private redrawCallback(timestamp: number) {
 		this.drawRequest = null;
+
+		if (this.needsResize) {
+			this.needsResize = false;
+			this.canvas.width = this.width;
+			this.canvas.height = this.height;
+
+			// CSS pixels can be fractional, but need to round to the same real pixels
+			var cssWidth: number = this.width / app.dpiScale; // NB. beware
+			var cssHeight: number = this.height / app.dpiScale;
+			this.canvas.style.width = cssWidth.toFixed(4) + 'px';
+			this.canvas.style.height = cssHeight.toFixed(4) + 'px';
+
+			// Avoid black default background.
+			this.clearCanvas();
+		}
+
 		this.drawSections();
 		this.flushLayoutingTasks();
 	}
@@ -1194,6 +1211,8 @@ class CanvasSectionContainer {
 		var section: CanvasSectionObject = this.findSectionContainingPoint(point);
 		if (section)
 			this.propagateOnMouseWheel(section, this.convertPositionToSectionLocale(section, point), delta, e);
+
+		app.idleHandler.notifyActive();
 	}
 
 	onMouseLeave (e: MouseEvent) {
@@ -1277,6 +1296,8 @@ class CanvasSectionContainer {
 				this.propagateOnMultiTouchMove(section, this.convertPositionToSectionLocale(section, this.touchCenter), distance, e);
 			}
 		}
+
+		app.idleHandler.notifyActive();
 	}
 
 	onTouchEnd (e: TouchEvent) { // Should be ignored unless this.draggingSomething = true.
@@ -1329,32 +1350,12 @@ class CanvasSectionContainer {
 			return;
 		}
 
-		// Drawing may happen asynchronously so backup the old contents to avoid
-		// showing a blank canvas.
-		var oldImageData: ImageData = null;
-		if (this.paintedEver && this.canvas.width > 0 && this.canvas.height > 0)
-			oldImageData = this.context.getImageData(0, 0, this.canvas.width, this.canvas.height);
-
-		this.canvas.width = newWidth;
-		this.canvas.height = newHeight;
-
-		// CSS pixels can be fractional, but need to round to the same real pixels
-		var cssWidth: number = newWidth / app.dpiScale; // NB. beware
-		var cssHeight: number = newHeight / app.dpiScale;
-		this.canvas.style.width = cssWidth.toFixed(4) + 'px';
-		this.canvas.style.height = cssHeight.toFixed(4) + 'px';
-
-		// Avoid black default background.
-		if (!oldImageData || this.width < newWidth || this.height < newHeight)
-			this.clearCanvas();
-		if (oldImageData)
-			this.context.putImageData(oldImageData, 0, 0);
-
 		this.clearMousePositions();
-		this.width = this.canvas.width;
-		this.height = this.canvas.height;
+		this.width = newWidth;
+		this.height = newHeight;
+		this.needsResize = true;
 
-		this.reNewAllSections(false);
+		this.reNewAllSections(true);
 	}
 
 	findSectionContainingPoint (point: Array<number>, interactable = true): any {
@@ -1675,7 +1676,7 @@ class CanvasSectionContainer {
 			}
 			else if (section.windowSection) {
 				section.myTopLeft = [0, 0];
-				section.size = [this.canvas.width, this.canvas.height];
+				section.size = [this.width, this.height];
 				section.isLocated = true;
 				this.windowSectionList.push(section);
 			}
@@ -2038,7 +2039,7 @@ class CanvasSectionContainer {
 
 	private animate (timeStamp: number) {
 		if (this.lastFrameStamp > 0)
-			this.elapsedTime += timeStamp - this.lastFrameStamp;
+			this.elapsedTime += Math.max(0, timeStamp - this.lastFrameStamp);
 
 		this.lastFrameStamp = timeStamp;
 
@@ -2113,7 +2114,7 @@ class CanvasSectionContainer {
 			if (options.defer)
 				requestAnimationFrame(this.animate.bind(this));
 			else
-				this.animate(performance.now());
+				this.animate(document.timeline.currentTime as number);
 			return true;
 		}
 		else {

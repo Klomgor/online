@@ -57,7 +57,7 @@ app.definitions.Socket = L.Class.extend({
 		}
 		if (socket && (socket.readyState === 1 || socket.readyState === 0)) {
 			this.socket = socket;
-		} else if (window.ThisIsAMobileApp) {
+		} else if (window.ThisIsTheGtkApp) {
 			// We have already opened the FakeWebSocket over in global.js
 			// But do we then set this.socket at all? Is this case ever reached?
 		} else	{
@@ -112,6 +112,7 @@ app.definitions.Socket = L.Class.extend({
 	},
 
 	setUnloading: function() {
+		window.prefs.sendPendingBrowserSettingsUpdate();
 		if (this.socket.setUnloading)
 			this.socket.setUnloading();
 	},
@@ -825,6 +826,7 @@ app.definitions.Socket = L.Class.extend({
 			}
 
 			app.setCommentEditingPermission(json.editComment); // May be allowed even in readonly mode.
+			app.setRedlineManagementAllowed(json.manageRedlines); // May be allowed even in readonly mode.
 		}
 		else if (textMsg.startsWith('lockfailed:')) {
 			this._map.onLockFailed(textMsg.substring('lockfailed:'.length).trim());
@@ -1651,8 +1653,8 @@ app.definitions.Socket = L.Class.extend({
 		this._map.fire('hyperlinkclicked', {url: link, coordinates: coords});
 	},
 
-	_onSocketError: function () {
-		window.app.console.debug('_onSocketError:');
+	_onSocketError: function (event) {
+		window.app.console.warn('_onSocketError:', event);
 		this._map.hideBusy();
 		// Let onclose (_onSocketClose) report errors.
 	},

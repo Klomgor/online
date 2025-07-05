@@ -337,7 +337,7 @@ coolconfig_SOURCES = tools/Config.cpp \
                     common/Log.cpp \
                     common/StringVector.cpp \
                     common/Util-server.cpp \
-		     common/Util-unix.cpp \
+                    common/Util-unix.cpp \
                     common/Util.cpp
 
 coolsocketdump_SOURCES = tools/WebSocketDump.cpp \
@@ -384,6 +384,7 @@ shared_headers = common/Anonymizer.hpp \
                  common/CharacterConverter.hpp \
                  common/Clipboard.hpp \
                  common/Crypto.hpp \
+                 common/Globals.hpp \
                  common/HexUtil.hpp \
                  common/JsonUtil.hpp \
                  common/FileUtil.hpp \
@@ -393,6 +394,7 @@ shared_headers = common/Anonymizer.hpp \
                  common/Protocol.hpp \
                  common/RegexUtil.hpp \
                  common/StateEnum.hpp \
+                 common/StaticLogHelper.hpp \
                  common/StringVector.hpp \
                  common/Seccomp.hpp \
                  common/Session.hpp \
@@ -422,6 +424,7 @@ shared_headers = common/Anonymizer.hpp \
                  net/DelaySocket.hpp \
                  net/FakeSocket.hpp \
                  net/HttpRequest.hpp \
+                 net/HttpServer.hpp \
                  net/HttpHelper.hpp \
                  net/NetUtil.hpp \
                  net/ServerSocket.hpp \
@@ -868,8 +871,9 @@ check-struct-packing:
 	fi
 	@echo coolwsd struct packing is acceptably optimal
 
-czech: check
-	@echo "This should do something much cooler"
+czech: all-local
+	@echo "Running unit-tests only"
+	$(MAKE) check -C test
 
 collabora-online-sbom.spdx.json: coolforkit-ns
 	$(QUIET_SBOM) python3 $(abs_top_srcdir)/scripts/create-sbom.py $(abs_top_builddir)

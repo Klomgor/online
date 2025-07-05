@@ -13,40 +13,40 @@
 
 #include "ClientSession.hpp"
 
-#include <filesystem>
-#include <ios>
-#include <map>
-#include <sstream>
-#include <string>
-#include <string_view>
-#include <memory>
-#include <unordered_map>
-#include <cctype>
+#include <common/Clipboard.hpp>
+#include <common/CommandControl.hpp>
+#include <common/Common.hpp>
+#include <common/ConfigUtil.hpp>
+#include <common/HexUtil.hpp>
+#include <common/JsonUtil.hpp>
+#include <common/Log.hpp>
+#include <common/Protocol.hpp>
+#include <common/Session.hpp>
+#include <common/TraceEvent.hpp>
+#include <common/Util.hpp>
+#include <net/HttpHelper.hpp>
+#include <net/HttpServer.hpp>
+#include <wopi/StorageConnectionManager.hpp>
+#include <wsd/COOLWSD.hpp>
+#include <wsd/DocumentBroker.hpp>
+#include <wsd/FileServer.hpp>
+#include <wsd/TileDesc.hpp>
 
 #include <Poco/Base64Decoder.h>
+#include <Poco/JSON/Parser.h>
 #include <Poco/MemoryStream.h>
 #include <Poco/Net/HTTPResponse.h>
 #include <Poco/StreamCopier.h>
 #include <Poco/URI.h>
-#include <Poco/JSON/Parser.h>
 
-#include "ConfigUtil.hpp"
-#include "DocumentBroker.hpp"
-#include "COOLWSD.hpp"
-#include "FileServer.hpp"
-#include <common/Common.hpp>
-#include <common/JsonUtil.hpp>
-#include <common/Log.hpp>
-#include <common/Protocol.hpp>
-#include <common/Clipboard.hpp>
-#include <common/Session.hpp>
-#include <common/TraceEvent.hpp>
-#include <common/HexUtil.hpp>
-#include <common/Util.hpp>
-#include <common/CommandControl.hpp>
-#include <wsd/TileDesc.hpp>
-#include <net/HttpHelper.hpp>
-#include <wopi/StorageConnectionManager.hpp>
+#include <cctype>
+#include <ios>
+#include <map>
+#include <memory>
+#include <sstream>
+#include <string>
+#include <string_view>
+#include <unordered_map>
 
 using namespace COOLProtocol;
 
@@ -262,6 +262,7 @@ bool ClientSession::matchesClipboardKeys(const std::string &/*viewId*/, const st
                        [&tag](const std::string& it) { return it == tag; });
 }
 
+// Rewrite path to be visible to the outside world
 static std::string getLocalPathToJail(std::string filePath, const DocumentBroker& docBroker)
 {
 #if !MOBILEAPP
@@ -271,7 +272,6 @@ static std::string getLocalPathToJail(std::string filePath, const DocumentBroker
         if (filePath.size() > 0 && filePath[0] == '/')
             filePath = filePath.substr(1);
 
-        // Rewrite path to be visible to the outside world.
         const Path path(FileUtil::buildLocalPathToJail(COOLWSD::EnableMountNamespaces,
                                                        docBroker.getJailRoot(),
                                                        filePath));
@@ -584,13 +584,11 @@ bool ClientSession::handleSignatureAction(const StringVector& tokens)
     std::string secret;
     JsonUtil::findJSONValue(serverPrivateInfoObject, "ESignatureSecret", secret);
     requestBodyObject->set("secret", secret);
-    std::string requestBody;
     std::stringstream oss;
     requestBodyObject->stringify(oss);
-    requestBody = oss.str();
     http::Request httpRequest(Poco::URI(requestUrl).getPathAndQuery());
     httpRequest.setVerb(http::Request::VERB_POST);
-    httpRequest.setBody(requestBody, "application/json");
+    httpRequest.setBody(oss.str(), "application/json");
     std::shared_ptr<DocumentBroker> docBroker = getDocumentBroker();
     httpSession->asyncRequest(httpRequest, docBroker->getPoll());
     return true;
@@ -1656,6 +1654,11 @@ bool ClientSession::loadDocument(const char* /*buffer*/, int /*length*/,
             oss << " isAllowChangeComments=true";
         }
 
+        if (isAllowManageRedlines())
+        {
+            oss << " isAllowManageRedlines=true";
+        }
+
         if (loadPart >= 0)
         {
             oss << " part=" << loadPart;
@@ -1962,12 +1965,14 @@ void ClientSession::setReadOnly(bool bVal)
     sendTextFrame("perm: " + sPerm);
 }
 
-void ClientSession::sendFileMode(const bool readOnly, const bool editComments)
+void ClientSession::sendFileMode(const bool readOnly, const bool editComments, bool manageRedlines)
 {
     std::string result = "filemode:{\"readOnly\": ";
     result += readOnly ? "true": "false";
     result += ", \"editComment\": ";
     result += editComments ? "true": "false";
+    result += ", \"manageRedlines\": ";
+    result += manageRedlines ? "true" : "false";
     result += "}";
     sendTextFrame(result);
 }
@@ -2537,7 +2542,7 @@ bool ClientSession::handleKitToClientMessage(const std::shared_ptr<Message>& pay
             else
             {
                 FileUtil::removeFile(jailClipFile);
-                jailClipFile = postProcessedClipFile;
+                jailClipFile = std::move(postProcessedClipFile);
             }
         }
 
@@ -2551,7 +2556,7 @@ bool ClientSession::handleKitToClientMessage(const std::shared_ptr<Message>& pay
             std::string cacheFile = COOLWSD::SavedClipboards->insertClipboard(_clipboardKeys, jailClipFile);
             if (cacheFile != jailClipFile)
             {
-                jailClipFile = cacheFile;
+                jailClipFile = std::move(cacheFile);
                 removeClipFile = false;
             }
         }
@@ -3476,13 +3481,14 @@ bool ClientSession::preProcessSetClipboardPayload(std::istream& in, std::ostream
     if (!Util::copyToMatch(in, out, "<div id=\"meta-origin\" data-coolorigin=\""))
         return false;
 
+    const std::string_view endtag = "\">\n";
     // discard this tag
-    if (!Util::seekToMatch(in, "\">\n"))
+    if (!Util::seekToMatch(in, endtag))
     {
         LOG_DBG("Found unbalanced starting meta <div> tag in setclipboard payload.");
         return false;
     }
-    in.seekg(3, std::ios_base::cur);
+    in.seekg(endtag.size(), std::ios_base::cur);
 
     if (!Util::copyToMatch(in, out, "</div></body>"))
     {

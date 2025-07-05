@@ -356,7 +356,7 @@ bool FileServerRequestHandler::isAdminLoggedIn(const HTTPRequest& request, http:
             // Last modified time of the file
             std::chrono::system_clock::time_point fileLastModifiedTime;
 
-            enum class COOLStatusCode
+            enum class COOLStatusCode : std::uint16_t
             {
                 DocChanged = 1010  // Document changed externally in storage
             };
@@ -828,7 +828,7 @@ bool FileServerRequestHandler::isAdminLoggedIn(const HTTPRequest& request, http:
 
                 std::string timestamp =
                     Util::getIso8601FracformatTime(std::chrono::system_clock::now());
-                const std::string body = "{\"LastModifiedTime\": \"" + timestamp + "\" }";
+                std::string body = "{\"LastModifiedTime\": \"" + timestamp + "\" }";
                 http::Response httpResponse(http::StatusCode::OK);
                 FileServerRequestHandler::hstsHeaders(httpResponse);
                 httpResponse.setBody(std::move(body), "application/json; charset=utf-8");

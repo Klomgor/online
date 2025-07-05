@@ -69,7 +69,6 @@ function _menubuttonControl (parentContainer, data, builder) {
 		var control = builder._unoToolButton(parentContainer, data, builder, options);
 
 		$(control.container).addClass('menubutton');
-		control.container.setAttribute('aria-haspopup', true);
 
 		$(control.button).unbind('click');
 		$(control.label).unbind('click');
@@ -93,6 +92,11 @@ function _menubuttonControl (parentContainer, data, builder) {
 					return true;
 				} else if (eventType === 'selected') {
 					builder.callback('menubutton', 'select', control.container, entry.id, builder);
+					JSDialog.CloseDropdown(dropdownId);
+					return true;
+				} else if (!entry){
+					// custom popup - execute generic action
+					builder.callback(objectType, eventType, object, data, builder);
 					JSDialog.CloseDropdown(dropdownId);
 					return true;
 				}

@@ -11,13 +11,14 @@
 
 #pragma once
 
-#include <Poco/Net/HTTPRequest.h>
-#include <Poco/URI.h>
-
+#include <common/Log.hpp>
 #include <common/StringVector.hpp>
 #include <common/Uri.hpp>
 #include <common/Util.hpp>
-#include <common/Log.hpp>
+#include <net/HttpRequest.hpp>
+
+#include <Poco/Net/HTTPRequest.h>
+#include <Poco/URI.h>
 
 /**
  * A class to encapsulate various useful pieces from the request.
@@ -99,7 +100,7 @@ class RequestDetails
 public:
 
     /// The fields of the URI.
-    enum class Field
+    enum class Field : std::uint8_t
     {
         Type,
         DocumentURI,
@@ -129,8 +130,8 @@ private:
     void processURI();
 
 public:
-
     RequestDetails(Poco::Net::HTTPRequest &request, const std::string& serviceRoot);
+    RequestDetails(http::Request& request, const std::string& serviceRoot);
     RequestDetails(const std::string &mobileURI);
 
     /// Constructs from its components.
@@ -295,6 +296,30 @@ public:
         return it != _fields.end() ? it->second == string : string.empty();
     }
 
+    bool operator==(const RequestDetails& rhs) const
+    {
+        if (_isGet != rhs._isGet)
+            return false;
+        if (_isHead != rhs._isHead)
+            return false;
+        if (_isProxy != rhs._isProxy)
+            return false;
+        if (_isWebSocket != rhs._isWebSocket)
+            return false;
+        if (_closeConnection != rhs._closeConnection)
+            return false;
+        if (_uriString != rhs._uriString)
+            return false;
+        if (_proxyPrefix != rhs._proxyPrefix)
+            return false;
+        if (_hostUntrusted != rhs._hostUntrusted)
+            return false;
+
+        return Util::equal(_params, rhs._params) && Util::equal(_fields, rhs._fields) &&
+               Util::equal(_docUriParams, rhs._docUriParams) &&
+               Util::equal(_pathSegs, rhs._pathSegs);
+    }
+
     std::string toString() const
     {
         std::ostringstream oss;
@@ -309,5 +334,11 @@ public:
         return oss.str();
     }
 };
+
+inline std::ostream& operator<<(std::ostream& os, const RequestDetails& details)
+{
+    os << details.toString();
+    return os;
+}
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */

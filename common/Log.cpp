@@ -27,9 +27,12 @@
 #include <Poco/AutoPtr.h>
 #include <Poco/FileChannel.h>
 #include <Poco/Logger.h>
+#include <Poco/Version.h>
 
 #include "Log.hpp"
+#include "StaticLogHelper.hpp"
 #include "Util.hpp"
+#include "Anonymizer.hpp"
 
 namespace
 {
@@ -79,7 +82,17 @@ public:
             break;
 #undef MAP
         }
-        log(text, prio);
+
+        if (getLevel() < prio)
+            return;
+#if POCO_VERSION >= 0x010D0000
+        Poco::Channel* pChannel = getChannel().get();
+#else
+        auto pChannel = getChannel();
+#endif
+        if (!pChannel)
+            return;
+        pChannel->log(Poco::Message(name(), text, prio));
     }
 
     static Log::Level mapToLevel(Poco::Message::Priority prio)
@@ -359,73 +372,8 @@ namespace Log
         std::unordered_map<Poco::Message::Priority, std::string> _colorByPriority;
     };
 
-    /// Helper to avoid destruction ordering issues.
-    static struct StaticHelper
-    {
-    private:
-        GenericLogger* _logger;
-        static thread_local GenericLogger* _threadLocalLogger;
-        std::string _name;
-        std::string _logLevel;
-        std::string _id;
-        std::atomic<bool> _inited;
-    public:
-        StaticHelper() :
-            _logger(nullptr),
-            _inited(true)
-        {
-        }
-        ~StaticHelper()
-        {
-            _inited = false;
-        }
-
-        bool getInited() const { return _inited; }
-
-        void setId(const std::string& id) { _id = id; }
-
-        const std::string& getId() const { return _id; }
-
-        void setName(const std::string& name) { _name = name; }
-
-        const std::string& getName() const { return _name; }
-
-        void setLevel(const std::string& logLevel) { _logLevel = logLevel; }
-
-        const std::string& getLevel() const { return _logLevel; }
-
-        void setLogger(GenericLogger* logger) { _logger = logger; };
-
-        void setThreadLocalLogger(GenericLogger* logger)
-        {
-            // FIXME: What to do with the previous thread-local logger, if any? Will deleting it
-            // destroy also its channel? That won't be good as we use the same channel for all
-            // loggers. Best to just leak it?
-            _threadLocalLogger = logger;
-        }
-
-        GenericLogger* getLogger() const { return _logger; }
-
-        GenericLogger* getThreadLocalLogger() const { return _threadLocalLogger; }
-
-    } Static;
-
-    static struct StaticUIHelper: StaticHelper
-    {
-    private:
-        bool _mergeCmd = false;
-        bool _logTimeEndOfMergedCmd = false;
-    public:
-        void setLogMergeInfo(bool mergeCmd, bool logTimeEndOfMergedCmd)
-        {
-            _mergeCmd = mergeCmd;
-            _logTimeEndOfMergedCmd = logTimeEndOfMergedCmd;
-        }
-        bool getMergeCmd() const { return _mergeCmd; }
-        bool getLogTimeEndOfMergedCmd() const { return _logTimeEndOfMergedCmd; }
-    } StaticUILog;
-
-    thread_local GenericLogger* StaticHelper::_threadLocalLogger = nullptr;
+    extern StaticHelper Static;
+    extern StaticUIHelper StaticUILog;
 
     bool IsShutdown = false;
 
@@ -895,7 +843,16 @@ namespace Log
 
         Log::logger().get(channel).setLevel(lvl);
     }
-
 } // namespace Log
+
+// Order of construction is unspecified when static objects are defined in different translation units, so
+// put globals here to specify order of construction/destruction.
+
+namespace Log {
+    StaticHelper Static;
+    StaticUIHelper StaticUILog;
+}
+
+std::unique_ptr<Anonymizer> Anonymizer::_instance;
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */

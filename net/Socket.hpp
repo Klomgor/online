@@ -11,6 +11,8 @@
 
 #pragma once
 
+#include <config.h>
+
 #if !MOBILEAPP
 #include <poll.h>
 #include <unistd.h>
@@ -279,7 +281,7 @@ public:
     /// Note: the upper limit is set via /proc/sys/net/core/wmem_max,
     /// and there is an unconfigurable lower limit as well.
     /// Returns true on success only.
-    bool setSocketBufferSize(const int size)
+    bool setSocketBufferSize([[maybe_unused]] const int size)
     {
 #if !MOBILEAPP
         int rc = ::setsockopt(_fd, SOL_SOCKET, SO_SNDBUF, &size, sizeof(size));
@@ -1000,11 +1002,11 @@ public:
     typedef std::function<void()> CallbackFn;
 
     /// Add a callback to be invoked in the polling thread
-    void addCallback(const CallbackFn& fn)
+    void addCallback(CallbackFn fn)
     {
         std::lock_guard<std::mutex> lock(_mutex);
         const bool wasEmpty = taskQueuesEmpty();
-        _newCallbacks.emplace_back(fn);
+        _newCallbacks.emplace_back(std::move(fn));
         if (wasEmpty)
             wakeup();
     }
@@ -1360,10 +1362,13 @@ public:
     bool sendAndShutdown(http::Response& response);
 
     /// Safely attempt to write any outgoing data.
-    inline void attemptWrites()
+    /// Returns true iff no data is left in the buffer.
+    inline bool attemptWrites()
     {
         if (!_outBuffer.empty())
             writeOutgoingData();
+
+        return _outBuffer.empty();
     }
 
 #if !MOBILEAPP
@@ -1590,11 +1595,21 @@ public:
     /// returns true if we did any re-sizing/movement of _inBuffer.
     bool compactChunks(MessageMap& map);
 
+    ssize_t readHeader(const std::string_view clientName, std::istream& message,
+                       size_t messagesize, Poco::Net::HTTPRequest& request,
+                       std::chrono::duration<float, std::milli> delayMs);
+
     /// Detects if we have an HTTP header in the provided message and
     /// populates a request for that.
-    bool parseHeader(const std::string_view clientName, std::istream& message,
-                     Poco::Net::HTTPRequest& request,
-                     std::chrono::steady_clock::time_point& lastHTTPHeader, MessageMap& map);
+    bool parseHeader(const std::string_view clientName, size_t headerSize, size_t bufferSize,
+                     const Poco::Net::HTTPRequest& request,
+                     std::chrono::duration<float, std::milli> delayMs,
+                     MessageMap& map);
+
+    void handleExpect(const Poco::Net::HTTPRequest& request);
+
+    bool checkChunks(const Poco::Net::HTTPRequest& request, size_t headerSize, MessageMap& map,
+                     std::chrono::duration<float, std::milli> delayMs);
 
     Buffer& getInBuffer() { return _inBuffer; }
 

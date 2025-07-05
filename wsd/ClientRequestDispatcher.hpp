@@ -81,8 +81,8 @@ private:
                                    const std::shared_ptr<StreamSocket>& socket);
 
     bool handleWopiAccessCheckRequest(const Poco::Net::HTTPRequest& request,
-                                   std::istream& message,
-                                   const std::shared_ptr<StreamSocket>& socket);
+                                      const std::string& text,
+                                      const std::shared_ptr<StreamSocket>& socket);
 
     /// @return true if request has been handled synchronously and response sent, otherwise false
     static bool handleClipboardRequest(const Poco::Net::HTTPRequest& request,
@@ -119,6 +119,26 @@ private:
 
     void sendResult(const std::shared_ptr<StreamSocket>& socket, CheckStatus result);
 
+    enum MessageResult { ServedAsync, ServedSync, Ignore };
+
+    MessageResult handleMessage(Poco::Net::HTTPRequest& request,
+                                std::istream& message,
+                                SocketDisposition& disposition,
+                                const std::shared_ptr<StreamSocket>& socket,
+                                ssize_t headerSize);
+
+    void finishedMessage(const Poco::Net::HTTPRequest& request,
+                         const std::shared_ptr<StreamSocket>& socket,
+                         bool servedSync, size_t preInBufferSz);
+
+    void handleFullMessage(Poco::Net::HTTPRequest& request,
+                           std::istream& message,
+                           SocketDisposition& disposition,
+                           const std::shared_ptr<StreamSocket>& socket,
+                           ssize_t headerSize,
+                           ssize_t contentSize,
+                           bool eraseMessageFromSocket,
+                           std::chrono::steady_clock::time_point now);
 #endif // !MOBILEAPP
 
     /// @return true if request has been handled synchronously and response sent, otherwise false
@@ -153,6 +173,11 @@ private:
     /// WS is created and as long as it is connected.
     std::shared_ptr<RequestVettingStation> _rvs;
 
+    /// scratch dir that POSTs are streamed to
+    std::unique_ptr<FileUtil::OwnedFile> _postFileDir;
+    std::fstream _postStream;
+    std::streamsize _postContentPending = 0;
+
     /// The minimum number of RVS instances in flight to trigger cleanup.
     static constexpr std::size_t RvsLowWatermark = 1 * 1024;
 
@@ -177,6 +202,9 @@ private:
 
     /// Cache for static files, to avoid reading and processing from disk.
     static std::map<std::string, std::string> StaticFileContentCache;
+
+    /// The next unique connection-ID.
+    static std::atomic<uint64_t> NextConnectionId;
 };
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */

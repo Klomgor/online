@@ -56,7 +56,6 @@ public:
 
     // An Application is a singleton anyway,
     // so just keep these as statics.
-    static std::atomic<uint64_t> NextConnectionId;
     static unsigned int NumPreSpawnedChildren;
 #if !MOBILEAPP
     static bool NoCapsForKit;
@@ -112,7 +111,7 @@ public:
     static std::unique_ptr<FileServerRequestHandler> FileRequestHandler;
 
     /// The WASM support/activation state.
-    enum class WASMActivationState
+    enum class WASMActivationState : std::uint8_t
     {
         Disabled,
         Enabled
@@ -157,11 +156,6 @@ public:
     static std::set<pid_t> getKitPids();
     static std::set<pid_t> getSpareKitPids();
     static std::set<pid_t> getDocKitPids();
-
-    static std::string GetConnectionId()
-    {
-        return Util::encodeId(NextConnectionId++, 3);
-    }
 
     static const std::string& getHardwareResourceWarning()
     {

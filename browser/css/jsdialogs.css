@@ -514,6 +514,10 @@ td.jsdialog > [id^='table-box']:not(.sidebar) {
 	justify-content: stretch;
 }
 
+.modalpopup .ui-treeview {
+	min-height: min-content;
+}
+
 .ui-treeview * {
 	border-radius: initial;
 }
@@ -890,6 +894,10 @@ input[type='checkbox']:checked.autofilter, .jsdialog input[type='checkbox']:chec
 	width: 100%;
 }
 
+:dir(rtl) .spinfield {
+	padding: 4px 4px 4px 0;
+}
+
 .spinfieldunit {
 	font-size: var(--default-font-size);
 	color: var(--color-text-dark);
@@ -973,8 +981,7 @@ input[type='number']:hover::-webkit-outer-spin-button {
 	display: none;
 }
 
-/* Draw SVG downwards arrow.
-The same as .unoarrow to replace the old .png bitmap arrow*/
+/* Draw vector border as downwards arrow. */
 .ui-listbox-arrow {
 	width: auto !important;
 	height: 0px;
@@ -990,10 +997,10 @@ The same as .unoarrow to replace the old .png bitmap arrow*/
 	pointer-events: none;
 }
 
-[data-theme='dark'] .ui-listbox-arrow {
-	border-top-color: var(--color-text-dark);
+:dir(rtl) .ui-listbox-arrow {
+	margin-inline-start: 4px;
+	margin-inline-end: -16px;
 }
-
 .ui-listbox[disabled='disabled'] ~ .ui-listbox-arrow,
 .ui-combobox[disabled='disabled'] ~ .ui-listbox-arrow {
 	opacity: 0.5;
@@ -1025,7 +1032,7 @@ The same as .unoarrow to replace the old .png bitmap arrow*/
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	border-left: 1px solid var(--color-border);
+	border-inline-start: 1px solid var(--color-border);
 	background-color: transparent;
 	padding-left: 20px;
 }
@@ -1179,6 +1186,8 @@ The same as .unoarrow to replace the old .png bitmap arrow*/
 	display: grid;
 	grid-template-columns: 1fr 1fr 1fr;
 	max-height: 40vh;
+	gap: 2px;
+	padding: 2px;
 }
 
 .ui-iconview.mobile-wizard {
@@ -1199,7 +1208,6 @@ The same as .unoarrow to replace the old .png bitmap arrow*/
 	align-self: center;
 	border: 1px solid transparent;
 	border-radius: var(--border-radius);
-	padding-top: 5px;
 	text-wrap: nowrap;
 	font-family: var(--jquery-ui-font);
 }
@@ -1215,6 +1223,10 @@ The same as .unoarrow to replace the old .png bitmap arrow*/
 	background-color: var(--color-background-darker);
 }
 
+.ui-iconview-entry img {
+	vertical-align: middle;
+}
+
 .ui-iconview-separator {
 	flex: 0 0 99%;
 }
@@ -1224,7 +1236,6 @@ The same as .unoarrow to replace the old .png bitmap arrow*/
 	flex-direction: column;
 	justify-content: center;
 	align-items: center;
-	margin: 5px;
 	text-align: center;
 	word-wrap: break-word;
 	overflow-wrap: break-word;
@@ -1479,7 +1490,7 @@ The same as .unoarrow to replace the old .png bitmap arrow*/
 	border: 4px solid transparent;
 	border-top: 5px solid var(--color-main-text);
 	display: inline-block !important;
-	margin-left: 3px;
+	margin-inline-start: 3px;
 	margin-top: 4px;
 }
 
@@ -1521,6 +1532,15 @@ The same as .unoarrow to replace the old .png bitmap arrow*/
 	padding: 8px 10px;
 	margin: 2px 0px;
 	background-color: var(--color-background-dark);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+
+button.menubutton.sidebar > span {
+	box-shadow: none !important;
+	font-size: var(--default-font-size) !important;
 }
 
 .jsdialog .unobutton img {
@@ -1531,7 +1551,7 @@ The same as .unoarrow to replace the old .png bitmap arrow*/
 .menubutton .arrow {
 	display: table-cell !important;
 	float: right;
-	margin: 5px 0px 5px 5px;
+	margin: 5px 0 0 5px;
 }
 
 .jsdialog.menubutton[disabled] {
@@ -1594,8 +1614,10 @@ The same as .unoarrow to replace the old .png bitmap arrow*/
 	height: 16px;
 }
 
-.ui-color-picker-entry:hover {
-	border: 1px solid var(--color-primary);
+.ui-color-picker-entry:hover,
+.ui-color-picker-entry:focus-visible {
+	outline: 2px solid var(--color-primary);
+	outline-offset: 1px;
 }
 
 #ui-color-picker-custom,
@@ -1709,19 +1731,73 @@ The same as .unoarrow to replace the old .png bitmap arrow*/
 	stop-opacity: 0.2;
 }
 
-/* progressbar */
+/* Regular ProgressBar */
 .ui-progressbar {
+	height: 5px !important;
 	display: flex;
 	align-items: center;
+	overflow: hidden;
 }
 
 .ui-progressbar progress {
 	width: 100%;
+	height: 5px;
+	background-color: rgba(var(--doc-type), 0.2);
+	border: none;
 }
 
-.snackbar .ui-progressbar progress {
-	min-width: 120px;
-	margin-right: 10px;
+[data-theme='dark'] .ui-progressbar progress {
+	background-color: #FFFF;
+}
+
+.ui-progressbar progress::-webkit-progress-bar {
+	background-color: rgba(var(--doc-type), 0.2);
+}
+
+.ui-progressbar progress::-webkit-progress-value,
+.ui-progressbar progress::-moz-progress-bar {
+	background-color: rgba(var(--doc-type));
+}
+
+/* Infinite Mode Styling */
+.ui-progressbar.infinite {
+	position: relative;
+	background-color: rgba(var(--doc-type), 0.2);
+	width: 100%;
+	overflow: hidden;
+}
+
+.ui-progressbar.infinite progress::-webkit-progress-bar,
+.ui-progressbar.infinite progress::-webkit-progress-value,
+.ui-progressbar.infinite progress::-moz-progress-bar {
+	background: transparent;
+}
+
+/* Indeterminate Animation Overlay */
+.ui-progressbar.infinite::after {
+	content: '';
+	position: absolute;
+	top: 0;
+	left: 0;
+	height: 100%;
+	width: 100%;
+	background-color: rgb(var(--doc-type));
+	animation: indeterminateAnimation 1s infinite linear;
+	transform-origin: 0% 50%;
+	z-index: 0;
+	pointer-events: none;
+}
+
+@keyframes indeterminateAnimation {
+	0% {
+		transform: translateX(0) scaleX(0);
+	}
+	40% {
+		transform: translateX(0) scaleX(0.4);
+	}
+	100% {
+		transform: translateX(100%) scaleX(0.5);
+	}
 }
 
 /* snackbar */
@@ -1735,7 +1811,18 @@ The same as .unoarrow to replace the old .png bitmap arrow*/
 .snackbar #snackbar-container-progress {
 	align-items: center;
 	max-width: calc(80vw);
+	row-gap: 4px;
 }
+
+.snackbar .ui-progressbar progress {
+	min-width: 120px;
+	margin-right: 10px;
+}
+
+.snackbar .ui-progressbar progress::-webkit-progress-bar {
+	background-color: #FFFF;
+}
+
 #mobile-wizard.popup.snackbar,
 .snackbar.jsdialog-container .ui-dialog-content {
 	min-width: 200px;
@@ -2354,4 +2441,26 @@ kbd,
 
 .status-hidden {
 	display: none !important;
+}
+
+/* Writer - Format - Page Style - Borders - Presets and Shadow Style - Position */
+/* Calc - Format - Format Page - Borders - Presets and Shadow Style - Position */
+#BorderPage.jsdialog #presets.ui-iconview,
+#BorderPage.jsdialog #shadows.ui-iconview {
+	grid-template-columns: 1fr 1fr 1fr 1fr 1fr; /* we want presets and shadows in a single row */
+	overflow: visible;
+}
+
+/* Impress - Sidebar - Layouts */
+/* Impress - Layout - Slide Transition */
+[data-theme='dark'] .sidebar-panel #layoutpanel_icons .ui-iconview-entry img,
+[data-theme='dark'] .sidebar-panel #transitions_icons .ui-iconview-entry img {
+	filter: invert(1);
+}
+
+/* Impress - Sidebar - Layouts */
+/* Draw - Insert - Fontwork */
+.sidebar-panel #layoutpanel_icons .ui-iconview-entry img,
+#FontworkGalleryDialog .ui-iconview-entry img {
+	padding: 5px 0;
 }

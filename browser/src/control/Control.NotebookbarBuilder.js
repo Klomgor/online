@@ -90,7 +90,6 @@ L.Control.NotebookbarBuilder = L.Control.JSDialogBuilder.extend({
 		this._toolitemHandlers['.uno:HideAllNotes'] = function() {};
 		this._toolitemHandlers['.uno:ShareDocument'] = function() {};
 		this._toolitemHandlers['.uno:EditDoc'] = function() {};
-		this._toolitemHandlers['.uno:AssignLayout'] = function() {};
 		this._toolitemHandlers['.uno:PresentationCurrentSlide'] = function() {};
 		this._toolitemHandlers['.uno:PresentationLayout'] = function() {};
 		this._toolitemHandlers['.uno:CapturePoint'] = function() {};
@@ -223,7 +222,8 @@ L.Control.NotebookbarBuilder = L.Control.JSDialogBuilder.extend({
 	{
 		var tooltipCollapsed = _('Tap to expand');
 		var tooltipExpanded = _('Tap to collapse');
-		$(tabs[t]).prop('title', tooltipExpanded);
+		tabs[t].setAttribute('data-cooltip', tooltipExpanded);
+		L.control.attachTooltipEventListener(tabs[t], builder.map);
 		return function(event) {
 			var tabIsSelected = $(tabs[t]).hasClass('selected');
 			var notebookbarIsCollapsed = builder.wizard.isCollapsed();
@@ -232,10 +232,10 @@ L.Control.NotebookbarBuilder = L.Control.JSDialogBuilder.extend({
 
 			if (tabIsSelected && !notebookbarIsCollapsed && !accessibilityInputElementHasFocus) {
 				builder.wizard.collapse();
-				$(tabs[t]).prop('title', tooltipCollapsed);
+				tabs[t].setAttribute('data-cooltip', tooltipCollapsed);
 			} else if (notebookbarIsCollapsed) {
 				builder.wizard.extend();
-				$(tabs[t]).prop('title', tooltipExpanded);
+				tabs[t].setAttribute('data-cooltip', tooltipExpanded);
 			}
 
 			$(tabs[t]).addClass('selected');
@@ -246,7 +246,7 @@ L.Control.NotebookbarBuilder = L.Control.JSDialogBuilder.extend({
 					$(tabs[i]).removeClass('selected');
 					tabs[i].setAttribute('aria-selected', 'false');
 					tabs[i].tabIndex = -1;
-					$(tabs[i]).prop('title', '');
+					tabs[i].setAttribute('data-cooltip', '');
 					$(contentDivs[i]).addClass('hidden');
 				}
 			}

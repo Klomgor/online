@@ -61,6 +61,7 @@ interface JSBuilder {
 	_getGridColumns: (data: WidgetJSON[]) => number;
 	_getGridRows: (data: WidgetJSON[]) => number;
 	_preventDocumentLosingFocusOnClick: (container: Element) => void;
+	_cleanText: (text: string) => string;
 	_expanderHandler: any; // FIXME: use handlers getter instead
 }
 
@@ -107,17 +108,18 @@ type JSDialogCallback = (
 
 // used to define menus
 type MenuDefinition = {
-	id: string; // unique identifier
-	type?: 'action' | 'menu' | 'separator' | 'html'; // type of entry
-	text: string; // displayed text
-	hint: string; // hint text
-	uno: string; // uno command
-	action: string; // dispatch command
-	htmlId: string; // id of HTMLContent
-	img: string; // icon name
-	icon: string; // icon name FIXME: duplicated property, used in exportMenuButton
-	checked: boolean; // state of check mark
-	items: Array<any>; // submenu
+	id?: string; // unique identifier
+	type: 'action' | 'menu' | 'separator' | 'html' | 'json'; // type of entry
+	text?: string; // displayed text
+	hint?: string; // hint text
+	uno?: string; // uno command
+	action?: string; // dispatch command
+	htmlId?: string; // DEPRECATED: id of HTMLContent - used in html type
+	content?: Array<WidgetJSON>; // custom content - used in json type
+	img?: string; // icon name
+	icon?: string; // icon name FIXME: duplicated property, used in exportMenuButton
+	checked?: boolean; // state of check mark
+	items?: Array<any>; // submenu
 };
 
 interface ContainerWidgetJSON extends WidgetJSON {

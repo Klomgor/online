@@ -183,7 +183,7 @@ function loadDocumentNoIntegration(filePath, isMultiUser) {
 				}
 			});
 		}
-	}).then(function(win) {
+	}).then(function() {
 		if (Cypress.config('logServerResponse')) {
 			cy.getFrameWindow()
 				.its('L', {log: false})
@@ -361,8 +361,10 @@ function documentChecks(skipInitializedCheck = false) {
 	cy.log('>> documentChecks - start');
 
 	cy.cGet('#document-canvas', {timeout : Cypress.config('defaultCommandTimeout') * 2.0});
-	if (!skipInitializedCheck)
-		cy.cGet('#map').should('have.class', 'initialized');
+	if (!skipInitializedCheck) {
+		cy.cGet('#map', {timeout : Cypress.config('defaultCommandTimeout') * 2.0})
+			.should('have.class', 'initialized');
+	}
 
 	// With php-proxy the client is irresponsive for some seconds after load, because of the incoming messages.
 	if (Cypress.env('INTEGRATION') === 'php-proxy') {
@@ -372,9 +374,8 @@ function documentChecks(skipInitializedCheck = false) {
 	// Wait for the sidebar to open.
 	if (Cypress.env('INTEGRATION') !== 'nextcloud') {
 		doIfOnDesktop(function() {
-			var showSidebar = localStorage.getItem('text.ShowSidebar');
-			if (Cypress.env('pdf-view') !== true && showSidebar !== 'false')
-				cy.cframe().find('#sidebar-panel').should('be.visible').should('not.be.empty');
+			if (Cypress.env('pdf-view') !== true)
+				cy.cGet('#sidebar-panel').should('be.visible').should('not.be.empty');
 
 			// Check that the document does not take the whole window width.
 			cy.window()
@@ -1189,6 +1190,12 @@ function assertImageSize(expectedWidth, expectedHeight) {
 	cy.log('<< assertImageSize - end');
 }
 
+function containsFocusElement(container, doesContain) {
+	cy.getFrameWindow().then(function(win) {
+		cy.expect(container.contains(win.document.activeElement)).to.equal(doesContain);
+	});
+}
+
 module.exports.setupDocument = setupDocument;
 module.exports.loadDocument = loadDocument;
 module.exports.setupAndLoadDocument = setupAndLoadDocument;
@@ -1237,3 +1244,4 @@ module.exports.getFileName = getFileName;
 module.exports.getSubFolder = getSubFolder;
 module.exports.addressInputSelector = "#addressInput input";
 module.exports.assertImageSize = assertImageSize;
+module.exports.containsFocusElement = containsFocusElement;
