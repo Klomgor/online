@@ -37,16 +37,16 @@ window.L.Map.include({
 		});
 	},
 
-	showResolvedComments: function(on: any) {
+	showResolvedComments: function(on: boolean = false) {
 		var unoCommand = '.uno:ShowResolvedAnnotations';
 		this.sendUnoCommand(unoCommand);
 		app.sectionContainer.getSectionWithName(app.CSections.CommentList.name).setViewResolved(on);
-		this.uiManager.setDocTypePref('ShowResolved', on ? true : false);
+		this.uiManager.setDocTypePref('ShowResolved', on);
 	},
 
-	showComments: function(on: any) {
+	showComments: function(on: boolean = false) {
 		app.sectionContainer.getSectionWithName(app.CSections.CommentList.name).setView(on);
-		this.uiManager.setDocTypePref('showannotations', on ? true : false);
+		this.uiManager.setDocTypePref('showannotations', on);
 		this.fire('commandstatechanged', {commandName : 'showannotations', state : on ? 'true': 'false'});
 		this.fire('showannotationschanged', {state: on ? 'true': 'false'});
 	}
@@ -77,6 +77,8 @@ export class CommentSection extends CanvasSectionObject {
 		collapsedCommentWidth: number;
 		showSelectedBigger: boolean;
 		commentsAreListed: boolean;
+		show: boolean;
+		showResolved: boolean;
 		[key: string]: any;
 		canvasContainerTop: number; // The top pixel of the document container. Added to positions of comments.
 		canvasContainerLeft: number;
@@ -109,7 +111,7 @@ export class CommentSection extends CanvasSectionObject {
 		this.sectionProperties.selectedComment = null;
 		this.sectionProperties.arrow = null;
 		this.sectionProperties.show = null;
-		this.sectionProperties.showResolved = null;
+		this.sectionProperties.showResolved = false;
 		this.sectionProperties.marginY = 10 * app.dpiScale;
 		this.sectionProperties.offset = 5 * app.dpiScale;
 		this.sectionProperties.width = Math.round(1 * app.dpiScale); // Configurable variable.
@@ -258,7 +260,7 @@ export class CommentSection extends CanvasSectionObject {
 	}
 
 	public setCollapsed(): void {
-		if (this.isEditing()) {
+		if (this.sectionProperties.show != true || this.isEditing()) {
 			return;
 		}
 
@@ -295,17 +297,14 @@ export class CommentSection extends CanvasSectionObject {
 			in case the comment section is half hidden and there
 			is some space on the left side of the document (since
 			the document is centered), we don't collapse the comments.
-
 			the comments section doesn't end up in such layout normally,
 			either the user resized the window, or zoomed in. both of
 			those events are being listened to in ViewLayoutWriter and
 			when that happens, `ViewLayoutWriter` moves the document to
 			the left in function `adjustDocumentMarginsForComments`.
 		*/
-		if (app.activeDocument.activeView instanceof ViewLayoutWriter
-			&& (app.activeDocument.activeView as ViewLayoutWriter).documentCanMoveLeft()) {
+		if (app.activeDocument.activeView.documentCanMoveLeft())
 			return false;
-		}
 		return availableSpace < this.sectionProperties.commentWidth && availableSpace > this.sectionProperties.collapsedCommentWidth;
 	}
 
@@ -1955,7 +1954,7 @@ export class CommentSection extends CanvasSectionObject {
 			}
 
 			lastY += (subList[i].getCommentHeight(relayout) * app.dpiScale);
-			if (!subList[i].isEdit())
+			if (this.sectionProperties.show != false && !subList[i].isEdit())
 				subList[i].show();
 		}
 		return lastY;
@@ -2200,7 +2199,7 @@ export class CommentSection extends CanvasSectionObject {
 		return index;
 	}
 
-	public setViewResolved (state: any): void {
+	public setViewResolved (state: boolean): void {
 		this.sectionProperties.showResolved = state;
 
 		for (var idx = 0; idx < this.sectionProperties.commentList.length;idx++) {
@@ -2219,13 +2218,19 @@ export class CommentSection extends CanvasSectionObject {
 		this.update();
 	}
 
-	public setView (state: any): void {
+	/*
+		also consider whether the comment to be shown is a resolved
+		comment and if so then check if the `showResolved` toggle
+		is on or off.
+	*/
+	public setView(state: boolean): void {
 		this.sectionProperties.show = state;
-		for (var idx = 0; idx < this.sectionProperties.commentList.length;idx++) {
-			if (state == false)
+		for (var idx = 0; idx < this.sectionProperties.commentList.length; idx++) {
+			if (state == false) {
 				this.sectionProperties.commentList[idx].hide();
-			else
+			} else if (this.sectionProperties.commentList[idx].sectionProperties.data.resolved != 'true' || this.sectionProperties.showResolved == true) {
 				this.sectionProperties.commentList[idx].show();
+			}
 		}
 	}
 
